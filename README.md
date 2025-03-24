@@ -2,7 +2,7 @@
 
 对比原项目是修复了一些逻辑、简化了一些东西、增加了一些功能、节省很多内存、一键启动无需配置
 
-**请尽快升级至v1.1.0+，大幅减少内存占用！！**
+**注意：当前是V2版本，有重大更新，请看最新Releases**
 
 ## 预览
 
@@ -26,8 +26,9 @@
 - 节点重命名
 - 节点测速（单线程）
 - 根据解锁情况分类保存
-- 支持外部拉取结果（默认监听 :8199）
+- 支持外部拉取结果（默认监听 :8199）（弃用）
 - 支持100+ 个通知渠道 通知检测结果
+- 内置sub-store程序
 
 ## 特点
 
@@ -51,11 +52,20 @@
 ## 部署/使用方式
 > 如果拉取订阅速度慢，可使用通用的 `HTTP_PROXY` `HTTPS_PROXY` 环境变量加快速度；此变量不会影响节点测试速度
 
-> 带用户名密码的Proxy也支持，使用 `http://username:password@host:port` 格式，比如
-
+> 带用户名密码的Proxy也支持，格式
+> http 代理 `http://username:password@host:port`
+> socks5代理：`socks5://username:password@host:port`
+> socks5h代理：`socks5h://username:password@host:port`
 ```bash
 export HTTP_PROXY=http://username:password@192.168.1.1:7890
 export HTTPS_PROXY=http://username:password@192.168.1.1:7890
+# socks5代理
+export HTTP_PROXY=socks5://username:password@192.168.1.1:7890
+export HTTPS_PROXY=socks5://username:password@192.168.1.1:7890
+# socks5h代理
+export HTTP_PROXY=socks5h://username:password@192.168.1.1:7890
+export HTTPS_PROXY=socks5h://username:password@192.168.1.1:7890
+
 ```
 如果想加速github的链接，可使用网上公开的`github proxy`，或者使用下方**自建测速地址**处的`worker.js`自建加速，自建的加速使用方式：
 ```
@@ -86,6 +96,7 @@ speed-test-url: https://custom-domain/speedtest?bytes=104857600
 speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 ```
 ### docker运行
+> 如果使用新功能sub-store，需要额外增加端口如 `-p 8299:8299`
 
 ```bash
 docker run -d --name subs-check -p 8199:8199 -v ./config:/app/config  -v ./output:/app/output --restart always ghcr.io/beck-8/subs-check:latest
@@ -108,6 +119,7 @@ services:
       - ./output:/app/output
     ports:
       - "8199:8199"
+      # - "8299:8299"
     environment:
       - TZ=Asia/Shanghai
       # 是否使用代理
@@ -172,18 +184,71 @@ recipient-url:
 - gist: 将结果保存到 github gist [配置方法](./doc/gist.md)
 - webdav: 将结果保存到 webdav 服务器 [配置方法](./doc/webdav.md)
 
-## 对外提供服务配置
+<!-- ## 对外提供服务配置
 > 根据客户端的类型自己选择是否需要订阅转换
 - `http://127.0.0.1:8199/all.yaml` 返回yaml格式节点
 - `http://127.0.0.1:8199/all.txt` 返回base64格式节点
 
 可以直接将base64格式订阅放到`V2rayN`中或者`Mihomo Party的sub-store`当中
 ![subset](./doc/images/subset.jpeg)
-![nodeinfo](./doc/images/nodeinfo.jpeg)
+![nodeinfo](./doc/images/nodeinfo.jpeg) -->
 
 ## 订阅使用方法
+> 内置了Sub-Store程序，可以生成任意类型的链接，设置端口才能打开此功能
 
-推荐直接裸核运行 tun 模式 
+### 推荐使用Sub-Store（非常推荐）
+> 假设你在配置文件中开启了此参数 `sub-store-port: 8299`
+
+> sub-store默认监听0.0.0.0，所以你可以在任何设备上访问，在非本机访问需要填写正确的IP
+
+> 注意：除非你知道你在干什么，否则不要将你的sub-store暴露到公网，否则可能会被滥用
+
+> 注意：你只需要更改IP和端口，path路径不需要更改。
+```
+# 通用订阅
+http://127.0.0.1:8299/download/sub
+
+# uri订阅
+http://127.0.0.1:8299/download/sub?target=URI
+
+# mihomo/clashmeta
+http://127.0.0.1:8299/download/sub?target=ClashMeta
+
+# clash订阅
+http://127.0.0.1:8299/download/sub?target=Clash
+
+# v2ray订阅
+http://127.0.0.1:8299/download/sub?target=V2Ray
+
+# shadowrocket订阅
+http://127.0.0.1:8299/download/sub?target=ShadowRocket
+
+# Quantumult订阅
+http://127.0.0.1:8299/download/sub?target=Quantumult
+
+# sing-box订阅
+http://127.0.0.1:8299/download/sub?target=sing-box
+
+# Surge订阅
+http://127.0.0.1:8299/download/sub?target=Surge
+
+# Surfboard订阅
+http://127.0.0.1:8299/download/sub?target=Surfboard
+```
+**OK，我知道你很懒，你想要带规则的mihomo/clash订阅，下边这个就是**。
+```
+# mihomo 带规则的配置
+http://127.0.0.1:8299/api/file/mihomo
+```
+> 小白勿看！！！  
+> 这个依赖github上的yaml文件进行覆写  
+> 默认使用: `https://slink.ltd/https://raw.githubusercontent.com/mihomo-party-org/override-hub/main/yaml/ACL4SSR_Online_Full.yaml`  
+> 如果遇到无法下载或者想使用其他格式，可以自己进后端管理配置，此处是判断是否有mihomo这个file，不管内容是什么，所以你做的更改不会被覆盖。  
+
+如果你还有什么其他的需求，使用上方的通用订阅自己处理，或者学习[sub-store](https://github.com/sub-store-org/sub-store-docs)中的文件管理，可以写任意插件，功能真的很强大！！！
+
+---
+**直接裸核运行 tun 模式（忽略）**
 
 原作者写的Windows下的裸核运行应用 [minihomo](https://github.com/bestruirui/minihomo)
 

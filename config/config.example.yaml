@@ -49,6 +49,10 @@ recipient-url:
   # 钉钉格式：dingtalk://<secret>@<dd_token>/<chat_id>
   # - dingtalk://xxxxxx@xxxxxxx/123123
 
+# sub-store的启动端口，注意没有冒号(:)，为空则不启动sub-store
+# sub-store-port: 8299
+sub-store-port: 
+
 # mihomo api url(测试完成后自动更新mihomo订阅)
 mihomo-api-url: ""
 
@@ -98,7 +102,6 @@ sub-urls:
   - "https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/sc3.yaml"
   - "https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/sc4.yaml"
   - "https://raw.githubusercontent.com/xiaoji235/airport-free/refs/heads/main/clash/naidounode.txt"
-  - "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/LogInfo.txt"
   - "https://raw.githubusercontent.com/mahdibland/SSAggregator/master/sub/sub_merge_yaml.yml"
   - "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.yml"
   - "https://raw.githubusercontent.com/vxiaov/free_proxies/main/clash/clash.provider.yaml"
