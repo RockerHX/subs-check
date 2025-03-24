@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/beck-8/subs-check/config"
 	"github.com/beck-8/subs-check/save/method"
 	"github.com/klauspost/compress/zstd"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func RunSubStoreService() {
@@ -31,7 +33,11 @@ func startSubStore() error {
 	if err != nil {
 		return err
 	}
-	nodePath := filepath.Join(saver.OutputPath, "node")
+	nodeName := "node"
+	if runtime.GOOS == "windows" {
+		nodeName += ".exe"
+	}
+	nodePath := filepath.Join(saver.OutputPath, nodeName)
 	jsPath := filepath.Join(saver.OutputPath, "sub-store.bundle.js")
 	logPath := filepath.Join(saver.OutputPath, "sub-store.log")
 
@@ -39,18 +45,20 @@ func startSubStore() error {
 		return err
 	}
 
-	// 打开日志文件
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("创建日志文件失败: %w", err)
+	// 配置日志轮转
+	logWriter := &lumberjack.Logger{
+		Filename:   logPath,
+		MaxSize:    10, // 每个日志文件最大 10MB
+		MaxBackups: 3,  // 保留 3 个旧文件
+		MaxAge:     7,  // 保留 7 天
 	}
-	defer logFile.Close()
+	defer logWriter.Close()
 
 	// 运行 JavaScript 文件
 	cmd := exec.Command(nodePath, jsPath)
 	cmd.Dir = saver.OutputPath
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
+	cmd.Stdout = logWriter
+	cmd.Stderr = logWriter
 	if config.GlobalConfig.ListenPort != "" {
 		cmd.Env = append(os.Environ(), fmt.Sprintf("SUB_STORE_BACKEND_API_PORT=%s", config.GlobalConfig.SubStorePort)) // 设置端口
 	}

@@ -103,7 +103,7 @@ func checkSub() error {
 	return nil
 }
 func createSub(data []byte) error {
-
+	// sub-store 上传默认限制1MB
 	sub := sub{
 		Content: string(data),
 		Name:    "sub",
