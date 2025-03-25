@@ -33,8 +33,10 @@ func startSubStore() error {
 	if err != nil {
 		return err
 	}
-	// 处理用户写相对路径的问题
-	saver.OutputPath = filepath.Join(saver.BasePath, saver.OutputPath)
+	if !filepath.IsAbs(saver.OutputPath) {
+		// 处理用户写相对路径的问题
+		saver.OutputPath = filepath.Join(saver.BasePath, saver.OutputPath)
+	}
 	nodeName := "node"
 	if runtime.GOOS == "windows" {
 		nodeName += ".exe"
