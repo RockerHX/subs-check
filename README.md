@@ -179,7 +179,7 @@ recipient-url:
 > 注意：选择保存方法时，记得更改 `save-method` 配置  
 > 如果上边部署了`worker.js`，下方使用即可，无需重复部署
 
-> 现在会保存两个文件，一个只有节点的`all.yaml`，另一个带有分流规则的`mihomo.yaml`
+> 现在会保存三个个文件，一个只有节点的`all.yaml`，一个带有分流规则的`mihomo.yaml`，另一个base64编码的`base64.txt`
 
 - 本地保存: 将结果保存到本地,默认保存到可执行文件目录下的 output 文件夹
 - r2: 将结果保存到 cloudflare r2 存储桶 [配置方法](./doc/r2.md)
@@ -190,6 +190,7 @@ recipient-url:
 > 根据客户端的类型自己选择是否需要订阅转换
 - `http://127.0.0.1:8199/all.yaml` 返回yaml格式节点
 - `http://127.0.0.1:8199/mihomo.yaml` 返回带分流规则的mihomo订阅
+- `http://127.0.0.1:8199/base64.txt` 返回base64格式的订阅
 
 
 ## 订阅使用方法
