@@ -53,8 +53,8 @@ type fileResult struct {
 }
 
 const (
-	subName    = "sub"
-	mihomoName = "mihomo"
+	SubName    = "sub"
+	MihomoName = "mihomo"
 )
 
 // 用来判断用户是否在运行时更改了覆写订阅的url
@@ -99,7 +99,7 @@ func UpdateSubStore(yamlData []byte) {
 	slog.Info("substore更新完成")
 }
 func checkSub() error {
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/api/sub/%s", config.GlobalConfig.SubStorePort, subName))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/api/sub/%s", config.GlobalConfig.SubStorePort, SubName))
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func updateSub(data []byte) error {
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPatch,
-		fmt.Sprintf("http://127.0.0.1:%s/api/sub/%s", config.GlobalConfig.SubStorePort, subName),
+		fmt.Sprintf("http://127.0.0.1:%s/api/sub/%s", config.GlobalConfig.SubStorePort, SubName),
 		bytes.NewBuffer(json))
 	if err != nil {
 		return err
@@ -182,7 +182,7 @@ func updateSub(data []byte) error {
 }
 
 func checkfile() error {
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/api/wholeFile/%s", config.GlobalConfig.SubStorePort, mihomoName))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/api/wholeFile/%s", config.GlobalConfig.SubStorePort, MihomoName))
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func checkfile() error {
 }
 func createfile() error {
 	file := file{
-		Name: mihomoName,
+		Name: MihomoName,
 		Process: []Operator{
 			{
 				Args: args{
@@ -237,7 +237,7 @@ func createfile() error {
 
 func updatefile() error {
 	file := file{
-		Name: mihomoName,
+		Name: MihomoName,
 		Process: []Operator{
 			{
 				Args: args{
@@ -259,7 +259,7 @@ func updatefile() error {
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPatch,
-		fmt.Sprintf("http://127.0.0.1:%s/api/file/%s", config.GlobalConfig.SubStorePort, mihomoName),
+		fmt.Sprintf("http://127.0.0.1:%s/api/file/%s", config.GlobalConfig.SubStorePort, MihomoName),
 		bytes.NewBuffer(json))
 	if err != nil {
 		return err

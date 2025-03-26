@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -41,6 +43,11 @@ func NewConfigSaver(results []check.Result) *ConfigSaver {
 		categories: []ProxyCategory{
 			{
 				Name:    "all.yaml",
+				Proxies: make([]map[string]any, 0),
+				Filter:  func(result check.Result) bool { return true },
+			},
+			{
+				Name:    "mihomo.yaml",
 				Proxies: make([]map[string]any, 0),
 				Filter:  func(result check.Result) bool { return true },
 			},
@@ -133,16 +140,41 @@ func (cs *ConfigSaver) saveCategory(category ProxyCategory) error {
 		slog.Warn(fmt.Sprintf("yaml节点为空，跳过保存: %s, saveMethod: %s", category.Name, config.GlobalConfig.SaveMethod))
 		return nil
 	}
-	yamlData, err := yaml.Marshal(map[string]any{
-		"proxies": category.Proxies,
-	})
-	if err != nil {
-		return fmt.Errorf("序列化yaml %s 失败: %w", category.Name, err)
+
+	if category.Name == "all.yaml" {
+		yamlData, err := yaml.Marshal(map[string]any{
+			"proxies": category.Proxies,
+		})
+		if err != nil {
+			return fmt.Errorf("序列化yaml %s 失败: %w", category.Name, err)
+		}
+		if err := cs.saveMethod(yamlData, category.Name); err != nil {
+			return fmt.Errorf("保存 %s 失败: %w", category.Name, err)
+		}
+		// 只在 all.yaml 和 local时，更新substore
+		if config.GlobalConfig.SaveMethod == "local" {
+			utils.UpdateSubStore(yamlData)
+		}
+		return nil
 	}
-	if err := cs.saveMethod(yamlData, category.Name); err != nil {
-		return fmt.Errorf("保存yaml %s 失败: %w", category.Name, err)
+	if category.Name == "mihomo.yaml" && config.GlobalConfig.SubStorePort != "" {
+		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/api/file/%s", config.GlobalConfig.SubStorePort, utils.MihomoName))
+		if err != nil {
+			return fmt.Errorf("获取mihomo file请求失败: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("获取mihomo file失败，状态码: %w", err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("读取mihomo file失败: %w", err)
+		}
+		if err := cs.saveMethod(body, category.Name); err != nil {
+			return fmt.Errorf("保存 %s 失败: %w", category.Name, err)
+		}
+		return nil
 	}
-	utils.UpdateSubStore(yamlData)
 
 	return nil
 }
@@ -430,26 +462,24 @@ func chooseSaveMethod() func([]byte, string) error {
 	switch config.GlobalConfig.SaveMethod {
 	case "r2":
 		if err := method.ValiR2Config(); err != nil {
-			slog.Error(fmt.Sprintf("R2配置不完整: %v", err))
-			return method.SaveToLocal
+			return func(b []byte, s string) error { return fmt.Errorf("R2配置不完整: %v", err) }
 		}
 		return method.UploadToR2Storage
 	case "gist":
 		if err := method.ValiGistConfig(); err != nil {
-			slog.Error(fmt.Sprintf("Gist配置不完整: %v", err))
-			return method.SaveToLocal
+			return func(b []byte, s string) error { return fmt.Errorf("Gist配置不完整: %v", err) }
 		}
 		return method.UploadToGist
 	case "webdav":
 		if err := method.ValiWebDAVConfig(); err != nil {
-			slog.Error(fmt.Sprintf("WebDAV配置不完整: %v", err))
-			return method.SaveToLocal
+			return func(b []byte, s string) error { return fmt.Errorf("WebDAV配置不完整: %v", err) }
 		}
 		return method.UploadToWebDAV
 	case "local":
 		return method.SaveToLocal
 	default:
-		slog.Error(fmt.Sprintf("未知的保存方法或其他方法配置错误: %v", config.GlobalConfig.SaveMethod))
-		return method.SaveToLocal
+		return func(b []byte, s string) error {
+			return fmt.Errorf("未知的保存方法或其他方法配置错误: %v", config.GlobalConfig.SaveMethod)
+		}
 	}
 }

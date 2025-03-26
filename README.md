@@ -272,7 +272,7 @@ proxy-providers:
 ```
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=beck-8/subs-check&type=Date)](https://www.star-history.com/#beck-8/subs-check&Date)
+[![Stargazers over time](https://starchart.cc/beck-8/subs-check.svg?variant=adaptive)](https://starchart.cc/beck-8/subs-check)
 ## 免责声明
 
 本工具仅用于学习和研究目的。使用者应自行承担使用风险，并遵守相关法律法规。
