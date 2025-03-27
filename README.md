@@ -149,6 +149,7 @@ go run main.go -f /path/to/config.yaml
 3. 请将你的Vercel项目添加一个自定义域名，因为Vercel在国内几乎访问不了
 
 ### docker部署
+> 不支持 arm/v7
 ```bash
 docker run --name apprise -p 8000:8000 --restart always -d caronc/apprise:latest
 ```
