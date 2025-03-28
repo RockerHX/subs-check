@@ -164,18 +164,21 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 	if err != nil || !google {
 		return nil
 	}
-	// 执行其他平台检测
-	openai, _ := platfrom.CheckOpenai(httpClient.Client)
-	youtube, _ := platfrom.CheckYoutube(httpClient.Client)
-	netflix, _ := platfrom.CheckNetflix(httpClient.Client)
-	disney, _ := platfrom.CheckDisney(httpClient.Client)
 
-	res.Cloudflare = cloudflare
-	res.Google = google
-	res.Openai = openai
-	res.Youtube = youtube
-	res.Netflix = netflix
-	res.Disney = disney
+	if config.GlobalConfig.RenameNode && config.GlobalConfig.MediaCheck {
+		// 执行其他平台检测
+		openai, _ := platfrom.CheckOpenai(httpClient.Client)
+		youtube, _ := platfrom.CheckYoutube(httpClient.Client)
+		netflix, _ := platfrom.CheckNetflix(httpClient.Client)
+		disney, _ := platfrom.CheckDisney(httpClient.Client)
+
+		res.Cloudflare = cloudflare
+		res.Google = google
+		res.Openai = openai
+		res.Youtube = youtube
+		res.Netflix = netflix
+		res.Disney = disney
+	}
 
 	var speed int
 	if config.GlobalConfig.SpeedTestUrl != "" {
@@ -229,9 +232,9 @@ func (pc *ProxyChecker) updateProxyName(res *Result, speed int) {
 		res.Proxy["name"] = strings.TrimSpace(res.Proxy["name"].(string)) + " | ⬇️ " + speedStr
 	}
 
-	if config.GlobalConfig.MediaCheck {
+	if config.GlobalConfig.RenameNode && config.GlobalConfig.MediaCheck {
 		if ipRisk != "" {
-			res.Proxy["name"] = res.Proxy["name"].(string) + "|" + ipRisk
+			res.Proxy["name"] = res.Proxy["name"].(string) + " |" + ipRisk
 		}
 		if res.Netflix {
 			res.Proxy["name"] = strings.TrimSpace(res.Proxy["name"].(string)) + "|Netflix"

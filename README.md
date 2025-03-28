@@ -15,11 +15,12 @@
 
 - 检测节点可用性,去除不可用节点
   - 新增参数`keep-success-proxies`用于持久保存测试成功的节点，可避免上游链接更新导致可用节点丢失，此功能默认关闭
-- ~~检测平台解锁情况~~ 暂时注释了，因为我觉得没啥用
-    - ~~openai~~
-    - ~~youtube~~
-    - ~~netflix~~
-    - ~~disney~~
+- 检测平台解锁情况（需要手动开启参数`media-check`）
+  - openai
+  - youtube
+  - netflix
+  - disney
+  - IP欺诈分数
 - 合并多个订阅
 - 将订阅转换为clash/mihomo/base64/QX等等[任意格式的订阅](https://github.com/beck-8/subs-check?tab=readme-ov-file#%E8%AE%A2%E9%98%85%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95)
 - 节点去重
