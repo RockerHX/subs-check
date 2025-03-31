@@ -69,6 +69,8 @@ func (app *App) Initialize() error {
 			slog.Warn("node不支持Linux 32位系统，不启动sub-store服务")
 		}
 		go assets.RunSubStoreService()
+		// 求等吗得，日志会按预期顺序输出
+		time.Sleep(500 * time.Millisecond)
 	}
 	return nil
 }
@@ -243,7 +245,6 @@ func main() {
 		slog.Error(fmt.Sprintf("初始化失败: %v", err))
 		os.Exit(1)
 	}
-	// 求等吗得，日志会按预期顺序输出
-	time.Sleep(500 * time.Millisecond)
+
 	app.Run()
 }
