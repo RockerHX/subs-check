@@ -22,7 +22,7 @@
   - disney
   - IP欺诈分数
 - 合并多个订阅
-- 将订阅转换为clash/mihomo/base64/QX等等[任意格式的订阅](https://github.com/beck-8/subs-check?tab=readme-ov-file#%E8%AE%A2%E9%98%85%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95)
+- 将订阅转换为clash/clash.meta/base64/QX等等[任意格式的订阅](https://github.com/beck-8/subs-check?tab=readme-ov-file#%E8%AE%A2%E9%98%85%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95)
 - 节点去重
 - 节点重命名
 - 节点测速（单线程）
@@ -116,7 +116,7 @@ docker run -d --name subs-check -p 8199:8199 -p 8299:8299 -e HTTP_PROXY=http://1
 ```yaml
 version: "3"
 services:
-  mihomo-check:
+  subs-check:
     image: ghcr.io/beck-8/subs-check:latest
     container_name: subs-check
     # mem_limit: 500m
