@@ -55,7 +55,7 @@ func NewProxyChecker(proxyCount int) *ProxyChecker {
 		proxyCount:  proxyCount,
 		threadCount: threadCount,
 		resultChan:  make(chan Result),
-		tasks:       make(chan map[string]any, proxyCount),
+		tasks:       make(chan map[string]any, 1),
 	}
 }
 
@@ -121,6 +121,10 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 
 	if config.GlobalConfig.PrintProgress {
 		done <- true
+	}
+
+	if config.GlobalConfig.SuccessLimit > 0 && pc.available >= config.GlobalConfig.SuccessLimit {
+		slog.Warn(fmt.Sprintf("达到节点数量限制: %d", config.GlobalConfig.SuccessLimit))
 	}
 	slog.Info(fmt.Sprintf("可用节点数量: %d", len(pc.results)))
 	return pc.results, nil
@@ -188,24 +192,17 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 		}
 	}
 	// 更新代理名称
-	pc.updateProxyName(res, speed)
+	pc.updateProxyName(res, httpClient, speed)
 	pc.incrementAvailable()
 	return res
 }
 
 // updateProxyName 更新代理名称
-func (pc *ProxyChecker) updateProxyName(res *Result, speed int) {
+func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, speed int) {
 	var ipRisk string
 	// 以节点IP查询位置重命名节点
 	if config.GlobalConfig.RenameNode {
-		// hy2协议 不知道为什么在被前边测速后就脏了，就不能用了，我也不知道为什么，奇葩。
-		// 可能底层mihomo的bug，什么泄露之类的，请求任何网址都超时。所以这里创新创建一个client
-		httpClient := CreateClient(res.Proxy)
-		if httpClient == nil {
-			slog.Debug(fmt.Sprintf("创建updateProxyName代理Client失败: %v", res.Proxy["name"]))
-			return
-		}
-		defer httpClient.Close()
+		// mihomo底层内存泄漏马上解决了
 		country, ip := proxyutils.GetProxyCountry(httpClient.Client)
 		if country == "" {
 			country = "未识别"
@@ -294,6 +291,9 @@ func (pc *ProxyChecker) incrementAvailable() {
 // distributeProxies 分发代理任务
 func (pc *ProxyChecker) distributeProxies(proxies []map[string]any) {
 	for _, proxy := range proxies {
+		if config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
+			break
+		}
 		pc.tasks <- proxy
 	}
 	close(pc.tasks)
@@ -309,6 +309,7 @@ func (pc *ProxyChecker) collectResults() {
 // CreateClient creates and returns an http.Client with a Close function
 type ProxyClient struct {
 	*http.Client
+	proxy constant.Proxy
 }
 
 func CreateClient(mapping map[string]any) *ProxyClient {
@@ -342,12 +343,20 @@ func CreateClient(mapping map[string]any) *ProxyClient {
 			Timeout:   time.Duration(config.GlobalConfig.Timeout) * time.Millisecond,
 			Transport: transport,
 		},
+		proxy: proxy,
 	}
 }
 
 // Close closes the proxy client and cleans up resources
 // 防止底层库有一些泄露，所以这里手动关闭
 func (pc *ProxyClient) Close() {
-	pc.CloseIdleConnections()
+	if pc.Client != nil {
+		pc.Client.CloseIdleConnections()
+	}
+
+	// 即使这里不关闭，底层GC的时候也会自动关闭
+	if pc.proxy != nil {
+		pc.proxy.Close()
+	}
 	pc.Client = nil
 }
