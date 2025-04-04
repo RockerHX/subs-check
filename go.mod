@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gin-gonic/gin v1.10.0
-	github.com/metacubex/mihomo v1.19.5-0.20250404053300-24a9ff6d03b8
+	github.com/metacubex/mihomo v1.19.5-0.20250404130554-190047c8c0e1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
