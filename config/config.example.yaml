@@ -31,6 +31,9 @@ listen-port: ":8199"
 # 质量差的节点可能造成IP查询失败，造成整体检查速度稍微变慢，默认true
 rename-node: true
 
+# 节点前缀，依赖rename-node为true才生效
+node-prefix: ""
+
 # 是否开启流媒体检测，其中IP欺诈依赖重命名
 media-check: false
 

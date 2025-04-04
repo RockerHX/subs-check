@@ -23,8 +23,6 @@ func RunSubStoreService() {
 	for {
 		if err := startSubStore(); err != nil {
 			slog.Error("Sub-store service crashed, restarting...", "error", err)
-			time.Sleep(time.Second * 30)
-			continue
 		}
 		time.Sleep(time.Second * 30)
 	}

@@ -207,7 +207,7 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 		if country == "" {
 			country = "未识别"
 		}
-		res.Proxy["name"] = proxyutils.Rename(country)
+		res.Proxy["name"] = config.GlobalConfig.NodePrefix + proxyutils.Rename(country)
 
 		if config.GlobalConfig.MediaCheck {
 			risk, err := platfrom.CheckIPRisk(httpClient.Client, ip)
