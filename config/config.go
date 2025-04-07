@@ -38,6 +38,7 @@ type Config struct {
 	NodePrefix         string   `yaml:"node-prefix"`
 	EnableWebUI        bool     `yaml:"enable-web-ui"`
 	APIKey             string   `yaml:"api-key"`
+	GithubProxy        string   `yaml:"github-proxy"`
 }
 
 var GlobalConfig = &Config{

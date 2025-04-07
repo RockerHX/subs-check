@@ -113,6 +113,10 @@ worker-token: 1234567890
 # 重试次数(获取订阅失败后重试次数)
 sub-urls-retry: 3
 
+# Github Proxy，获取订阅使用，结尾要带的 /
+# github-proxy: "https://ghfast.top/"
+github-proxy: ""
+
 # 订阅地址 支持 clash/mihomo/v2ray/base64 格式的订阅链接
 # 如果用户想使用clash类型，那可以在支持的订阅链接结尾加上 &flag=clash.meta
 # github 链接可自己添加ghproxy使用；订阅链接支持 HTTP_PROXY HTTPS_PROXY 环境变量加速拉取
