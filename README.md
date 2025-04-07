@@ -82,15 +82,16 @@ export HTTPS_PROXY=socks5h://username:password@192.168.1.1:7890
 
 > **GitHub 加速说明：**
 > 如果想加速github的链接，可使用网上公开的`github proxy`，或者使用下方**自建测速地址**处的`worker.js`自建加速，自建的加速使用方式：
-
+>
 > 注意只能加速 GitHub的链接。带不带协议头均可，支持 release、archive 以及文件
 
-```bash
+```yaml
 # 新版本直接更改配置文件中的参数
 # Github Proxy，获取订阅使用，结尾要带的 /
 # github-proxy: "https://ghfast.top/"
 github-proxy: "https://custom-domain/raw/"
 ```
+
 ```bash
 # 下边是旧版本的用法，需要自己添加前缀
 https://custom-domain/raw/https://raw.githubusercontent.com/mfuu/v2ray/master/clash.yaml
@@ -101,7 +102,9 @@ https://custom-domain/raw/链接
 
 > **节点持久化说明：**
 > 因为上游订阅链接可能是爬虫，所以本地可用的节点经常被刷新掉，所以可以使用 `keep-success-proxies` 参数持久保存测试成功的节点
+>
 > 此参数默认关闭。并且会将数据临时存放到内存中，如果可用节点数量非常多，请不要打开此参数（因为可能会占用一点内存）。
+>
 > **可将生成的链接添加到订阅链接当中一样可以实现此效果**
 
 ### 编辑配置文件（可选）
@@ -109,6 +112,7 @@ https://custom-domain/raw/链接
 程序运行第一次会在程序当前目录生成默认配置文件，再次运行即可起飞。
 
 ### 自建测速地址（可选）
+
 > **注意：** 尽量不要使用Speedtest，Cloudflare提供的下载链接，因为很多节点屏蔽测速网站
 
 1. 将 [worker.js](./doc/cloudflare/worker.js) 部署到 Cloudflare Workers
@@ -122,7 +126,8 @@ speed-test-url: https://custom-domain/speedtest?bytes=104857600
 speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 ```
 
-### docker运行
+### Docker运行
+
 > **注意：** 如果需要限制内存，请使用docker自带的内存限制参数 `--memory="500m"`
 
 ```bash
@@ -149,7 +154,7 @@ docker run -d \
   ghcr.io/beck-8/subs-check:latest
 ```
 
-### docker-compose
+### Docker-Compose
 
 ```yaml
 version: "3"
@@ -181,21 +186,23 @@ go run main.go -f /path/to/config.yaml
 ```
 
 ### 二进制文件运行
-下载 [releases](https://github.com/beck-8/subs-check/releases)当中的适合自己的版本解压  
-直接运行即可,会在当前目录生成配置文件
+
+下载 [releases](https://github.com/beck-8/subs-check/releases) 当中的适合自己的版本解压直接运行即可,会在当前目录生成配置文件
 
 ## 通知渠道配置方法（可选）
 
-目前，此项目使用[Apprise](https://github.com/caronc/apprise)发送通知，并支持 100+ 个通知渠道。  
-但是 apprise 库是用 Python 编写的，Cloudflare 最近发布的 python worker在部署 apprise 时仍然存在问题  
+目前，此项目使用 [Apprise](https://github.com/caronc/apprise) 发送通知，并支持 100+ 个通知渠道。  
+但是 apprise 库是用 Python 编写的，Cloudflare 最近发布的 python worker 在部署 apprise 时仍然存在问题  
 所以我们下边提供两种部署方式的教程（当然实际不止两种）
 
 ### Vercel serverless 部署
-1. 请单击[**此处**](https://vercel.com/new/clone?repository-url=https://github.com/beck-8/apprise_vercel)即可在您的 Vercel 帐户上部署 Apprise  
-2. 部署后，您将获得一个类似 `https://testapprise-beck8s-projects.vercel.app/` 的链接，在其后附加`/notify` ，然后您将获得 Apprise API 服务器的链接： `https://testapprise-beck8s-projects.vercel.app/notify`
-3. 请将你的Vercel项目添加一个自定义域名，因为Vercel在国内几乎访问不了
 
-### docker部署
+1. 请单击 [**此处**](https://vercel.com/new/clone?repository-url=https://github.com/beck-8/apprise_vercel) 即可在您的 Vercel 帐户上部署 Apprise  
+2. 部署后，您将获得一个类似 `https://testapprise-beck8s-projects.vercel.app/` 的链接，在其后附加 `/notify`，然后您将获得 Apprise API 服务器的链接：`https://testapprise-beck8s-projects.vercel.app/notify`
+3. 请将你的 Vercel 项目添加一个自定义域名，因为 Vercel 在国内几乎访问不了
+
+### Docker部署
+
 > **注意：** 不支持 arm/v7
 
 ```bash
@@ -212,7 +219,7 @@ docker run --name apprise \
 ```
 
 > **配置说明：**
-> 根据[Apprise wiki](https://github.com/caronc/apprise/wiki)编写发送通知的 URL，其中有关于如何设置每个通知渠道的详细文档和说明。
+> 根据 [Apprise wiki](https://github.com/caronc/apprise/wiki) 编写发送通知的 URL，其中有关于如何设置每个通知渠道的详细文档和说明。
 
 ```yaml
 # Apprise API 服务器配置
@@ -230,7 +237,7 @@ recipient-url:
 ## 保存方法配置
 
 > **注意：** 选择保存方法时，记得更改 `save-method` 配置  
-> 如果上边部署了`worker.js`，下方使用即可，无需重复部署
+> 如果上边部署了 `worker.js`，下方使用即可，无需重复部署
 
 > **文件说明：** 现在会保存三个个文件：
 > - `all.yaml`：仅包含节点
@@ -297,10 +304,10 @@ http://127.0.0.1:8299/download/sub?target=Surfboard
 ```
 
 > **快速获取带规则的mihomo/clash订阅：**
-> ```
-> # mihomo 带规则的配置
-> http://127.0.0.1:8299/api/file/mihomo
-> ```
+```bash
+# mihomo 带规则的配置
+http://127.0.0.1:8299/api/file/mihomo
+```
 
 > **高级说明：**
 > - 这个依赖github上的yaml文件进行覆写  
@@ -311,16 +318,16 @@ http://127.0.0.1:8299/download/sub?target=Surfboard
 > 上方的是基于此链接download下来的文件，主要用于保存到 `local` `r2` `gist` `webdav` 使用，所以你使用哪个都可以。唯一的区别在于，**此链接会根据你配置的覆写URL，实时生成带分流规则的文件**。
 
 > **扩展功能：**
-> 如果你还有什么其他的需求，使用上方的通用订阅自己处理，或者学习[sub-store](https://github.com/sub-store-org/sub-store-docs)中的文件管理，可以写任意插件，功能真的很强大！！！
+> 如果你还有什么其他的需求，使用上方的通用订阅自己处理，或者学习 [sub-store](https://github.com/sub-store-org/sub-store-docs) 中的文件管理，可以写任意插件，功能真的很强大！！！
 
 > **访问说明：**
-> 当你打开`http://127.0.0.1:8299`，你发现跳转到了`https://sub-store.vercel.app/subs`，看[**这里**](./doc/sub-store.md)
+> 当你打开 `http://127.0.0.1:8299`，你发现跳转到了 `https://sub-store.vercel.app/subs`，看 [**这里**](./doc/sub-store.md)
 
-## 直接裸核运行 tun 模式（可选）
+**直接裸核运行 tun 模式（可选）**
 
 原作者写的Windows下的裸核运行应用 [minihomo](https://github.com/bestruirui/minihomo)
 
-1. 下载[base.yaml](./doc/base.yaml)
+1. 下载 [base.yaml](./doc/base.yaml)
 2. 将文件中对应的链接改为自己的即可
 
 ```yaml
