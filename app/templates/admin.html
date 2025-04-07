@@ -103,6 +103,39 @@
             font-size: 1.75rem;
             font-weight: 600;
         }
+        /* 旋转动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .rotate-animation {
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        /* 配置编辑器蒙版 */
+        .editor-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(235, 235, 235, 0.85);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .editor-overlay-message {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+        .editor-wrapper {
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -147,7 +180,9 @@
                     <strong>当前状态:</strong> <span id="nextCheckTime">加载中...</span>
                 </div>
                 <div class="col-md-4 col-sm-6 status-item text-md-end">
-                    <button id="triggerCheck" class="btn btn-primary btn-sm">立即检测</button>
+                    <button id="triggerCheck" class="btn btn-primary btn-sm">
+                        <i class="bi bi-play-fill me-1"></i>立即检测
+                    </button>
                 </div>
             </div>
         </div>
@@ -158,7 +193,9 @@
                     <div class="card-header">
                         <div class="d-flex justify-content-between align-items-center">
                             <span>最近日志</span>
-                            <button id="refreshLogs" class="btn btn-secondary btn-sm">刷新</button>
+                            <button id="refreshLogs" class="btn btn-secondary btn-sm">
+                                <i class="bi bi-arrow-repeat me-1"></i>刷新
+                            </button>
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -173,13 +210,25 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <span>配置编辑器</span>
                             <div>
+                                <button id="toggleConfig" class="btn btn-outline-secondary btn-sm me-2" title="显示/隐藏配置">
+                                    <i class="bi bi-eye-slash"></i>
+                                </button>
                                 <button id="saveConfig" class="btn btn-success btn-sm">保存配置</button>
-                                <button id="reloadConfig" class="btn btn-secondary btn-sm ms-2">重新加载</button>
+                                <button id="reloadConfig" class="btn btn-secondary btn-sm ms-2">
+                                    <i class="bi bi-arrow-repeat me-1"></i>重新加载
+                                </button>
                             </div>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div id="editor"></div>
+                        <div class="editor-wrapper">
+                            <div id="editor"></div>
+                            <div id="editorOverlay" class="editor-overlay">
+                                <div class="editor-overlay-message">
+                                    <i class="bi bi-eye-slash me-2"></i>配置已隐藏，点击查看
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -278,6 +327,30 @@
             
             // 加载配置
             loadConfig();
+            
+            // 设置编辑器遮罩层
+            const toggleConfigBtn = document.getElementById('toggleConfig');
+            const editorOverlay = document.getElementById('editorOverlay');
+            
+            // 默认隐藏配置
+            editorOverlay.style.display = 'flex';
+            
+            // 点击按钮切换显示/隐藏
+            toggleConfigBtn.addEventListener('click', function() {
+                const isHidden = editorOverlay.style.display === 'flex';
+                editorOverlay.style.display = isHidden ? 'none' : 'flex';
+                
+                // 更新按钮图标
+                const icon = toggleConfigBtn.querySelector('i');
+                icon.className = isHidden ? 'bi bi-eye' : 'bi bi-eye-slash';
+            });
+            
+            // 点击遮罩层也可以切换显示
+            editorOverlay.addEventListener('click', function() {
+                editorOverlay.style.display = 'none';
+                const icon = toggleConfigBtn.querySelector('i');
+                icon.className = 'bi bi-eye';
+            });
         });
         
         // 处理未授权响应
@@ -293,7 +366,7 @@
         
         // 加载配置
         function loadConfig() {
-            fetch('/api/config', {
+            return fetch('/api/config', {
                 headers: addApiKeyHeader()
             })
             .then(response => {
@@ -309,6 +382,7 @@
                 if (editor && data) {
                     editor.setValue(data.content);
                 }
+                return data;
             })
             .catch(error => {
                 console.error('加载配置失败:', error);
@@ -348,12 +422,34 @@
         });
         
         // 重新加载配置
-        document.getElementById('reloadConfig').addEventListener('click', loadConfig);
+        document.getElementById('reloadConfig').addEventListener('click', function() {
+            const button = this;
+            const icon = button.querySelector('i');
+            
+            // 添加旋转动画
+            icon.classList.add('rotate-animation');
+            button.disabled = true;
+            
+            // 加载配置
+            loadConfig()
+                .finally(() => {
+                    // 延迟移除动画，以便用户能看到
+                    setTimeout(() => {
+                        icon.classList.remove('rotate-animation');
+                        button.disabled = false;
+                    }, 500);
+                });
+        });
         
         // 立即检测
         document.getElementById('triggerCheck').addEventListener('click', function() {
-            this.disabled = true;
-            this.textContent = '检测中...';
+            const button = this;
+            const icon = button.querySelector('i');
+            const originalIcon = icon.className;
+            
+            // 替换图标并添加旋转动画
+            icon.className = 'bi bi-arrow-repeat me-1 rotate-animation';
+            button.disabled = true;
             
             fetch('/api/trigger-check', {
                 method: 'POST',
@@ -374,14 +470,17 @@
                 }
             })
             .finally(() => {
-                this.disabled = false;
-                this.textContent = '立即检测';
+                // 还原按钮
+                setTimeout(() => {
+                    icon.className = originalIcon;
+                    button.disabled = false;
+                }, 500);
             });
         });
         
         // 加载日志
         function loadLogs() {
-            fetch('/api/logs', {
+            return fetch('/api/logs', {
                 headers: addApiKeyHeader()
             })
             .then(response => {
@@ -404,6 +503,7 @@
                     });
                     logsContainer.scrollTop = logsContainer.scrollHeight;
                 }
+                return data;
             })
             .catch(error => {
                 if (error.message !== '未授权') {
@@ -427,7 +527,24 @@
         }
         
         // 刷新日志
-        document.getElementById('refreshLogs').addEventListener('click', loadLogs);
+        document.getElementById('refreshLogs').addEventListener('click', function() {
+            const button = this;
+            const icon = button.querySelector('i');
+            
+            // 添加旋转动画
+            icon.classList.add('rotate-animation');
+            button.disabled = true;
+            
+            // 加载日志
+            loadLogs()
+                .finally(() => {
+                    // 延迟移除动画，以便用户能看到
+                    setTimeout(() => {
+                        icon.classList.remove('rotate-animation');
+                        button.disabled = false;
+                    }, 500);
+                });
+        });
         
         // 更新状态
         function updateStatus() {
