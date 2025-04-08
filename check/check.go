@@ -78,16 +78,19 @@ func Check() ([]Result, error) {
 	proxyutils.ResetRenameCounter()
 	ForceClose.Store(false)
 
-	proxies, err := proxyutils.GetProxies()
-	if err != nil {
-		return nil, fmt.Errorf("获取节点失败: %w", err)
-	}
-	slog.Info(fmt.Sprintf("获取节点数量: %d", len(proxies)))
-
+	// 之前好的节点前置
+	var proxies []map[string]any
 	if config.GlobalConfig.KeepSuccessProxies {
 		slog.Info(fmt.Sprintf("添加之前测试成功的节点，数量: %d", len(config.GlobalProxies)))
 		proxies = append(proxies, config.GlobalProxies...)
 	}
+	tmp, err := proxyutils.GetProxies()
+	if err != nil {
+		return nil, fmt.Errorf("获取节点失败: %w", err)
+	}
+	proxies = append(proxies, tmp...)
+	slog.Info(fmt.Sprintf("获取节点数量: %d", len(proxies)))
+
 	// 重置全局节点
 	config.GlobalProxies = make([]map[string]any, 0)
 
