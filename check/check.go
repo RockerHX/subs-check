@@ -78,6 +78,10 @@ func Check() ([]Result, error) {
 	proxyutils.ResetRenameCounter()
 	ForceClose.Store(false)
 
+	ProxyCount.Store(0)
+	Available.Store(0)
+	Progress.Store(0)
+
 	// 之前好的节点前置
 	var proxies []map[string]any
 	if config.GlobalConfig.KeepSuccessProxies {

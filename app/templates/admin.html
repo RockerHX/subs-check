@@ -120,6 +120,8 @@
             right: 0;
             bottom: 0;
             background-color: rgba(235, 235, 235, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 10;
             display: flex;
             justify-content: center;
@@ -127,11 +129,14 @@
             cursor: pointer;
         }
         .editor-overlay-message {
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(255, 255, 255, 0.5);
+            color: #333;
             padding: 15px 20px;
             border-radius: 5px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             text-align: center;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
         .editor-wrapper {
             position: relative;
@@ -162,14 +167,30 @@
             left: 0;
             top: 0;
             z-index: 10;
+            box-shadow: 0 0 8px #28a745; /* 添加发光效果 */
+            border-radius: 0 4px 4px 0; /* 右侧圆角 */
         }
         .progress-bar-total {
-            background-color: #17a2b8; /* 总进度条使用青色 */
+            background-color: rgba(23, 162, 184, 0.5); /* 总进度条使用半透明青色 */
             position: absolute;
             height: 100%;
             left: 0;
             top: 0;
             z-index: 5;
+        }
+        /* 闪烁效果 */
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        .success-highlight {
+            animation: pulse 1.5s infinite;
+            font-weight: bold;
+            color: #28a745;
+            padding: 0 2px;
+            border-radius: 3px;
+            background-color: rgba(40, 167, 69, 0.1);
         }
     </style>
 </head>
@@ -672,12 +693,24 @@
             
             // 更新成功文本
             const successText = document.getElementById('successText');
-            successText.textContent = `${available}/${total}`;
             
-            // 更新成功进度条
-            const progressBarSuccess = document.getElementById('progressBarSuccess');
-            progressBarSuccess.style.width = `${percentSuccess}%`;
-            progressBarSuccess.setAttribute('aria-valuenow', percentSuccess);
+            // 根据成功率决定是否添加高亮样式
+            if (available > 0) { 
+                // 任何时候有成功节点，都添加高亮效果
+                successText.innerHTML = `<span class="success-highlight">${available}</span>/${total}`;
+                
+                // 更新成功进度条
+                const progressBarSuccess = document.getElementById('progressBarSuccess');
+                progressBarSuccess.style.width = `${percentSuccess}%`;
+                progressBarSuccess.setAttribute('aria-valuenow', percentSuccess);
+            } else {
+                successText.textContent = `${available}/${total}`;
+                
+                // 更新成功进度条
+                const progressBarSuccess = document.getElementById('progressBarSuccess');
+                progressBarSuccess.style.width = `${percentSuccess}%`;
+                progressBarSuccess.setAttribute('aria-valuenow', percentSuccess);
+            }
         }
         
         // 更新状态
