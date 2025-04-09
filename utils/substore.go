@@ -210,7 +210,7 @@ func createfile() error {
 		Process: []Operator{
 			{
 				Args: args{
-					Content: config.GlobalConfig.MihomoOverwriteUrl,
+					Content: WarpUrl(config.GlobalConfig.MihomoOverwriteUrl),
 					Mode:    "link",
 				},
 				Disabled: false,
@@ -244,7 +244,7 @@ func updatefile() error {
 		Process: []Operator{
 			{
 				Args: args{
-					Content: config.GlobalConfig.MihomoOverwriteUrl,
+					Content: WarpUrl(config.GlobalConfig.MihomoOverwriteUrl),
 					Mode:    "link",
 				},
 				Disabled: false,
@@ -286,4 +286,12 @@ func formatPort(port string) string {
 		return ":" + parts[len(parts)-1]
 	}
 	return ":" + port
+}
+
+func WarpUrl(url string) string {
+	// 如果url中以https://raw.githubusercontent.com开头，那么就使用github代理
+	if strings.HasPrefix(url, "https://raw.githubusercontent.com") {
+		return config.GlobalConfig.GithubProxy + url
+	}
+	return url
 }

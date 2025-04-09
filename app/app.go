@@ -79,7 +79,7 @@ func (app *App) Initialize() error {
 	monitor.StartMemoryMonitor()
 
 	// 设置信号处理器
-	utils.SetupSignalHandler()
+	utils.SetupSignalHandler(&check.ForceClose)
 	return nil
 }
 

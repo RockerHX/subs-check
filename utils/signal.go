@@ -5,9 +5,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
-
-	"github.com/beck-8/subs-check/check"
 )
 
 // 内部状态跟踪
@@ -17,7 +16,7 @@ import (
 // 同时支持两种信号处理模式：
 // - HUB 信号(SIGHUP): 只设置 check.ForceClose 为 true，不退出程序
 // - Ctrl+C 信号(SIGINT/SIGTERM): 第一次设置 ForceClose，第二次退出程序
-func SetupSignalHandler() {
+func SetupSignalHandler(forceClose *atomic.Bool) {
 	slog.Debug("设置信号处理器")
 
 	// 监听 SIGINT (Ctrl+C)
@@ -57,7 +56,7 @@ func SetupSignalHandler() {
 			slog.Debug(fmt.Sprintf("收到 HUB 信号: %s", sig))
 
 			// HUB 信号只设置 ForceClose，不退出程序
-			check.ForceClose.Store(true)
+			forceClose.Store(true)
 			slog.Debug("HUB 模式: 已设置强制关闭标志，任务将自动结束，程序继续运行")
 		}
 	}()
