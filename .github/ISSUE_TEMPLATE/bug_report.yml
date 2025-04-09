@@ -13,6 +13,8 @@ body:
           required: true
         - label: 我已在 [Issues](https://github.com/beck-8/subs-check/issues) 中搜索，未找到类似的问题。
           required: true
+        - label: 我已在 [config.example.yaml](https://github.com/beck-8/subs-check/blob/master/config/config.example.yaml) 中看过，未找到相关配置
+          required: true
   - type: textarea
     id: description
     attributes:
