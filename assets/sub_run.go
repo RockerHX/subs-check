@@ -112,6 +112,8 @@ func startSubStore() error {
 		return fmt.Errorf("invalid port format: %s", config.GlobalConfig.SubStorePort)
 	}
 
+	// https://hub.docker.com/r/xream/sub-store
+	// 这里有详细的变量说明，可能用NO_PROXY过滤到127.0.0.1更合适
 	// 如果MihomoOverwriteUrl包含本地IP，则移除所有代理环境变量
 	if cleanProxyEnv {
 		filteredEnv := make([]string, 0, len(cmd.Env))
@@ -131,6 +133,9 @@ func startSubStore() error {
 		}
 		cmd.Env = filteredEnv
 	}
+
+	// 增加body限制，默认1M
+	cmd.Env = append(cmd.Env, "SUB_STORE_BODY_JSON_LIMIT=10mb")
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("启动 sub-store 失败: %w", err)
