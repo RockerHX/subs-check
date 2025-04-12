@@ -129,7 +129,9 @@ func GetDateFromSubs(subUrl string) ([]byte, error) {
 	maxRetries := config.GlobalConfig.SubUrlsReTry
 	var lastErr error
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Duration(config.GlobalConfig.Timeout) * time.Millisecond,
+	}
 
 	for i := 0; i < maxRetries; i++ {
 		if i > 0 {
