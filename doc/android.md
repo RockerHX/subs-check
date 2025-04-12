@@ -20,7 +20,6 @@ pkg update && pkg add nodejs ca-certificates which -y
 # 无Root权限的手机设置,有Root权限应该授权后无需设置
 export SSL_CERT_FILE="/data/data/com.termux/files/usr/etc/tls/cert.pem"
 
-# 无Root权限的手机设置
 export NODEBIN_PATH="$(which node)"
 ```
 
