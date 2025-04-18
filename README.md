@@ -133,6 +133,8 @@ speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 
 > **注意：** 如果需要限制内存，请使用docker自带的内存限制参数 `--memory="500m"`
 
+> 可使用环境变量`API_KEY`直接设置Web控制面板的api-key
+
 ```bash
 # 基础运行
 docker run -d \
@@ -177,6 +179,8 @@ services:
       # 是否使用代理
       # - HTTP_PROXY=http://192.168.1.1:7890
       # - HTTPS_PROXY=http://192.168.1.1:7890
+      # 设置 api-key
+      # - API_KEY=password
     restart: always
     tty: true
     network_mode: bridge

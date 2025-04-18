@@ -42,8 +42,12 @@ func (app *App) initHttpServer() error {
 	// 根据配置决定是否启用Web控制面板
 	if config.GlobalConfig.EnableWebUI {
 		if config.GlobalConfig.APIKey == "" {
-			config.GlobalConfig.APIKey = GenerateSimpleKey()
-			slog.Warn("未设置APIKey，已生成一个随机APIKey", "api-key", config.GlobalConfig.APIKey)
+			if apiKey := os.Getenv("API_KEY"); apiKey != "" {
+				config.GlobalConfig.APIKey = apiKey
+			} else {
+				config.GlobalConfig.APIKey = GenerateSimpleKey()
+				slog.Warn("未设置api-key，已生成一个随机api-key", "api-key", config.GlobalConfig.APIKey)
+			}
 		}
 		slog.Info("启用Web控制面板", "path", "http://ip:port/admin", "api-key", config.GlobalConfig.APIKey)
 
