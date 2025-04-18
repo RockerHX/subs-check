@@ -43,3 +43,16 @@
 ## 想要DIY？
 
 在原基础上新建订阅或者文件，不要在subs-check专用的配置上修改！！！
+
+## 安全/自定义PATH
+> 你担心安全问题，就修改配置里的自定义path
+```bash
+# sub-store自定义访问路径，必须以/开头，后续访问订阅也要带上此路径
+# 设置path之后，还可以开启订阅分享功能，无需暴露真实的path
+# sub-store-path: "/path"
+sub-store-path: "diypath"
+```
+访问路径变成`http://127.0.0.1:8299/diypath`
+
+![步骤十](./images/sub-store10.png)
+![步骤十一](./images/sub-store11.png)
