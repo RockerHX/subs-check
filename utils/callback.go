@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -53,10 +54,27 @@ func ExecuteCallback(successCount int) {
 		// Windows 系统
 		if strings.HasSuffix(strings.ToLower(callbackScript), ".bat") ||
 			strings.HasSuffix(strings.ToLower(callbackScript), ".cmd") {
-			cmd = exec.Command("cmd", "/C", callbackScript)
+			// 使用完整路径，并正确处理带空格的路径
+			absPath, err := filepath.Abs(callbackScript)
+			if err != nil {
+				slog.Error(fmt.Sprintf("获取脚本绝对路径失败: %v", err))
+				return
+			}
+			cmd = exec.Command("cmd", "/C", absPath)
+		} else if strings.HasSuffix(strings.ToLower(callbackScript), ".ps1") {
+			// PowerShell 脚本
+			absPath, err := filepath.Abs(callbackScript)
+			if err != nil {
+				slog.Error(fmt.Sprintf("获取脚本绝对路径失败: %v", err))
+				return
+			}
+			// 使用 -ExecutionPolicy Bypass 绕过执行策略限制
+			cmd = exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", absPath)
 		} else {
 			cmd = exec.Command(callbackScript)
 		}
+		// 设置工作目录为脚本所在目录
+		cmd.Dir = filepath.Dir(callbackScript)
 	} else {
 		// Unix/Linux/MacOS 系统
 		cmd = exec.Command(callbackScript)
@@ -71,6 +89,5 @@ func ExecuteCallback(successCount int) {
 		slog.Error(fmt.Sprintf("执行回调脚本失败: %v, 输出: %s", err, string(output)))
 		return
 	}
-
 	slog.Info("回调脚本执行成功")
 }
