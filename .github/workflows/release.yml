@@ -81,6 +81,6 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           build-args: |
             GITHUB_SHA=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.tags }}
+            VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
