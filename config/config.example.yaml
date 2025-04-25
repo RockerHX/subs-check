@@ -108,7 +108,7 @@ sub-store-path: ""
 # 如果你想替换其他的自定义覆写文件，自己命名后放在output目录，然后更改此URL后缀即可
 mihomo-overwrite-url: "http://127.0.0.1:8199/sub/ACL4SSR_Online_Full.yaml"
 
-# mihomo api url(测试完成后自动更新mihomo订阅，使用场景有限)
+# mihomo api url(测试完成后自动更新mihomo订阅，使用场景有限不要使用)
 mihomo-api-url: ""
 
 # mihomo api secret

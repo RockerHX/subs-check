@@ -2,6 +2,7 @@ FROM golang:alpine AS builder
 WORKDIR /app
 COPY . .
 ARG GITHUB_SHA
+ARG VERSION
 RUN apk add --no-cache nodejs zstd && \
     ARCH=$(uname -m) && \
     case "$ARCH" in \
@@ -12,7 +13,7 @@ RUN apk add --no-cache nodejs zstd && \
     esac
 RUN echo "Building commit: ${GITHUB_SHA:0:7}" && \
     go mod tidy && \
-    go build -ldflags="-s -w -X main.CurrentCommit=${GITHUB_SHA:0:7}" -o main .
+    go build -ldflags="-s -w -X main.Version=${VERSION} -X main.CurrentCommit=${GITHUB_SHA:0:7}" -o main .
 
 FROM alpine
 ENV TZ=Asia/Shanghai
