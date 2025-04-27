@@ -217,7 +217,12 @@
                         <label for="apiKey" class="form-label mb-0"><strong>API密钥:</strong></label>
                     </div>
                     <div class="col-md-7 col-sm-8">
-                        <input type="password" class="form-control" id="apiKey" placeholder="请输入API密钥">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="apiKey" placeholder="请输入API密钥">
+                            <button class="btn btn-outline-secondary" type="button" id="toggleApiKey">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-2 col-sm-4 text-end mt-sm-2">
                         <button id="saveApiKey" class="btn btn-primary btn-sm">保存密钥</button>
@@ -325,6 +330,20 @@
         // 初始化API密钥
         const storedApiKey = localStorage.getItem('apiKey') || '';
         document.getElementById('apiKey').value = storedApiKey;
+        
+        // 切换API密钥可见性
+        document.getElementById('toggleApiKey').addEventListener('click', function() {
+            const apiKeyInput = document.getElementById('apiKey');
+            const icon = this.querySelector('i');
+            
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                icon.className = 'bi bi-eye';
+            } else {
+                apiKeyInput.type = 'password';
+                icon.className = 'bi bi-eye-slash';
+            }
+        });
         
         // 保存API密钥到本地存储
         document.getElementById('saveApiKey').addEventListener('click', function() {
