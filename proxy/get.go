@@ -21,8 +21,8 @@ func GetProxies() ([]map[string]any, error) {
 	slog.Info(fmt.Sprintf("当前设置订阅链接数量: %d", len(config.GlobalConfig.SubUrls)))
 
 	var wg sync.WaitGroup
-	proxyChan := make(chan map[string]any, 1)                                // 缓冲通道存储解析的代理
-	concurrentLimit := make(chan struct{}, config.GlobalConfig.SubUrlsReTry) // 限制并发数
+	proxyChan := make(chan map[string]any, 1)                              // 缓冲通道存储解析的代理
+	concurrentLimit := make(chan struct{}, config.GlobalConfig.Concurrent) // 限制并发数
 
 	// 启动收集结果的协程
 	var mihomoProxies []map[string]any
@@ -130,7 +130,7 @@ func GetDateFromSubs(subUrl string) ([]byte, error) {
 	var lastErr error
 
 	client := &http.Client{
-		Timeout: time.Duration(60) * time.Second,
+		Timeout: time.Duration(10) * time.Second,
 	}
 
 	for i := 0; i < maxRetries; i++ {
