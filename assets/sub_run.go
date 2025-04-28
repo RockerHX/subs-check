@@ -83,6 +83,10 @@ func startSubStore() error {
 	if nodeBinPath := os.Getenv("NODEBIN_PATH"); nodeBinPath != "" {
 		nodePath = nodeBinPath
 	}
+	// 支持自定义sub-store脚本路径
+	if subStoreBinPath := os.Getenv("SUB_STORE_PATH"); subStoreBinPath != "" {
+		jsPath = subStoreBinPath
+	}
 	// 运行 JavaScript 文件
 	cmd := exec.Command(nodePath, jsPath)
 	// js会在运行目录释放依赖文件
