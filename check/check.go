@@ -51,6 +51,7 @@ type ProxyChecker struct {
 var Progress atomic.Uint32
 var Available atomic.Uint32
 var ProxyCount atomic.Uint32
+var TotalBytes atomic.Int64
 
 var ForceClose atomic.Bool
 
@@ -62,8 +63,6 @@ func NewProxyChecker(proxyCount int) *ProxyChecker {
 	}
 
 	ProxyCount.Store(uint32(proxyCount))
-	Available.Store(0)
-	Progress.Store(0)
 	return &ProxyChecker{
 		results:     make([]Result, 0),
 		proxyCount:  proxyCount,
@@ -81,6 +80,8 @@ func Check() ([]Result, error) {
 	ProxyCount.Store(0)
 	Available.Store(0)
 	Progress.Store(0)
+
+	TotalBytes.Store(0)
 
 	// 之前好的节点前置
 	var proxies []map[string]any
@@ -149,6 +150,9 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 		slog.Warn(fmt.Sprintf("达到节点数量限制: %d", config.GlobalConfig.SuccessLimit))
 	}
 	slog.Info(fmt.Sprintf("可用节点数量: %d", len(pc.results)))
+	if config.GlobalConfig.SpeedTestUrl != "" {
+		slog.Info(fmt.Sprintf("测速总消耗流量: %.2fGB", float64(TotalBytes.Load())/1024/1024/1024))
+	}
 	return pc.results, nil
 }
 
@@ -233,8 +237,10 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 	}
 
 	var speed int
+	var totalBytes int64
 	if config.GlobalConfig.SpeedTestUrl != "" {
-		speed, err = platform.CheckSpeed(httpClient.Client)
+		speed, totalBytes, err = platform.CheckSpeed(httpClient.Client)
+		TotalBytes.Add(totalBytes)
 		if err != nil || speed < config.GlobalConfig.MinSpeed {
 			return nil
 		}
