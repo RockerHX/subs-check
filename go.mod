@@ -127,3 +127,5 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
+
+replace github.com/metacubex/mihomo => github.com/beck-8/mihomo v1.19.5-0.20250513020202-e50cbbdb35aa
