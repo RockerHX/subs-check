@@ -128,4 +128,4 @@ require (
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
 
-replace github.com/metacubex/mihomo => github.com/beck-8/mihomo v1.19.9-fix.0.20250523134706-9eba9a2dbf3c
+replace github.com/metacubex/mihomo => github.com/beck-8/mihomo v1.19.9-fix.0.20250525053213-cdbe8b4c5046
