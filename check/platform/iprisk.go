@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/beck-8/2clash/convert"
+	"github.com/metacubex/mihomo/common/convert"
 )
 
 func CheckIPRisk(httpClient *http.Client, ip string) (string, error) {
