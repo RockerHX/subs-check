@@ -471,6 +471,7 @@ func (pc *ProxyChecker) checkSubscriptionSuccessRate(allProxies []map[string]any
 				stats.success++
 				subStats[subUrl] = stats
 			}
+			delete(result.Proxy, "subscription_url")
 		}
 	}
 

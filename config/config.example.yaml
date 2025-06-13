@@ -159,7 +159,6 @@ sub-urls:
   # - https://raw.githubusercontent.com/example/repo/main/config/{Ymd}.yaml
   # - https://raw.githubusercontent.com/example/repo/main/daily/daily-{Y}-{m}-{d}.yaml
   - "https://raw.githubusercontent.com/firefoxmmx2/v2rayshare_subcription/main/subscription/clash_sub.yaml"
-  - "https://raw.githubusercontent.com/Roywaller/clash_subscription/refs/heads/main/clash_subscription.txt"
   - "https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/sc0.yaml"
   - "https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/sc1.yaml"
   - "https://raw.githubusercontent.com/Q3dlaXpoaQ/V2rayN_Clash_Node_Getter/refs/heads/main/APIs/sc2.yaml"
@@ -170,14 +169,11 @@ sub-urls:
   - "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.yml"
   - "https://raw.githubusercontent.com/vxiaov/free_proxies/main/clash/clash.provider.yaml"
   - "https://raw.githubusercontent.com/snakem982/proxypool/main/source/clash-meta.yaml"
-  - "https://raw.githubusercontent.com/leetomlee123/freenode/refs/heads/main/README.md"
   - "https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"
   - "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/clash.yml"
   - "https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"
   - "https://raw.githubusercontent.com/mgit0001/test_clash/refs/heads/main/heima.txt"
-  - "https://raw.githubusercontent.com/mai19950/clashgithub_com/refs/heads/main/site"
   - "https://raw.githubusercontent.com/aiboboxx/v2rayfree/refs/heads/main/README.md"
-  - "https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/sub"
   - "https://raw.githubusercontent.com/shahidbhutta/Clash/refs/heads/main/Router"
   - "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.meta.yml"
   - "https://raw.githubusercontent.com/anaer/Sub/refs/heads/main/clash.yaml"
