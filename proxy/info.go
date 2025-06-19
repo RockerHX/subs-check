@@ -10,10 +10,17 @@ import (
 	"log/slog"
 
 	"github.com/beck-8/subs-check/config"
+	"github.com/metacubex/mihomo/common/convert"
 )
 
 func GetProxyCountry(httpClient *http.Client) (string, string) {
 	url := "https://www.cloudflare.com/cdn-cgi/trace"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("创建请求失败: %s", err))
+		return "", ""
+	}
+	req.Header.Set("User-Agent", convert.RandUserAgent())
 	var loc, ip string
 	for attempts := 0; attempts < config.GlobalConfig.SubUrlsReTry; attempts++ {
 		resp, err := httpClient.Get(url)
