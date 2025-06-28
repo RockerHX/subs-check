@@ -254,6 +254,9 @@ http://127.0.0.1:8299/api/file/mihomo
   <summary>展开查看</summary>
 
 **检测流程**
+
+![架构图1](./doc/images/arch1.svg)  
+<div style="display:none"> 
 ```mermaid
 graph TD
     A[订阅链接] -->|获取订阅链接| B[转成 YAML 格式]
@@ -273,7 +276,12 @@ graph TD
     J -->|ShadowRocket 格式| K3[输出 ShadowRocket 节点]
     J -->|其他格式| K4[输出其他格式节点]
 ```
+</div>
+
 **subs-check与sub-store之间的关系**
+
+![架构图2](./doc/images/arch2.svg)  
+<div style="display:none">  
 ```mermaid
 graph TD
     A[订阅链接] -->|获取订阅链接| B[subs-check]
@@ -288,7 +296,9 @@ graph TD
         E -->|其他类型订阅| H1[生成 Clash, V2Ray, ShadowRocket 等]
         E -->|订阅分享| H2[分享订阅链接]
     end
-```
+``` 
+</div>
+
 </details>
 
 ## 🙏 鸣谢
