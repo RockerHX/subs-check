@@ -15,10 +15,10 @@ import (
 
 func GetProxyCountry(httpClient *http.Client) (loc string, ip string) {
 	for i := 0; i < config.GlobalConfig.SubUrlsReTry; i++ {
-		// loc, ip = GetIPSB(httpClient)
-		// if loc != "" && ip != "" {
-		// 	return
-		// }
+		loc, ip = GetIPLark(httpClient)
+		if loc != "" && ip != "" {
+			return
+		}
 		loc, ip = GetCFProxy(httpClient)
 		if loc != "" && ip != "" {
 			return
@@ -115,43 +115,41 @@ func GetCFProxy(httpClient *http.Client) (loc string, ip string) {
 	return
 }
 
-// 使用自定义httpClient请求有问题，不知道对方网站依据什么进行判断的
-func GetIPSB(httpClient *http.Client) (loc string, ip string) {
+func GetIPLark(httpClient *http.Client) (loc string, ip string) {
 	type GeoIPData struct {
 		IP      string `json:"ip"`
-		Country string `json:"continent_code"`
+		Country string `json:"country_code"`
 	}
 
-	url := "https://api.ip.sb/geoip"
+	url := "https://iplark.com/ipapi/public/ipinfo"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("创建请求失败: %s", err))
 		return
 	}
 	req.Header.Set("User-Agent", convert.RandUserAgent())
-	resp, err := httpClient.Get(url)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("ip.sb获取节点位置失败: %s", err))
+		slog.Debug(fmt.Sprintf("iplark获取节点位置失败: %s", err))
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		slog.Debug(fmt.Sprintf("ip.sb返回非200状态码: %v", resp.StatusCode))
+		slog.Debug(fmt.Sprintf("iplark返回非200状态码: %v", resp.StatusCode))
 		return
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-
-		slog.Debug(fmt.Sprintf("ip.sb读取节点位置失败: %s", err))
+		slog.Debug(fmt.Sprintf("iplark读取节点位置失败: %s", err))
 		return
 	}
 
 	var geo GeoIPData
 	err = json.Unmarshal(body, &geo)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("解析ip.sb JSON 失败: %v", err))
+		slog.Debug(fmt.Sprintf("解析iplark JSON 失败: %v", err))
 		return
 	}
 
