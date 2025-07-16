@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-func CheckYoutube(httpClient *http.Client) (bool, error) {
+func CheckYoutube(httpClient *http.Client) (string, error) {
 	// 创建请求
 	req, err := http.NewRequest("GET", "https://www.youtube.com/premium", nil)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	// 添加请求头
@@ -26,23 +26,23 @@ func CheckYoutube(httpClient *http.Client) (bool, error) {
 	// 发送请求
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	// 在body中查找 countryCode 并提取区域代码
 	idx := strings.Index(string(body), `"countryCode"`)
 	if idx != -1 {
 		region := strings.Replace(string(body)[idx:idx+17], `"countryCode":"`, "", 1)
 		if region != "" {
-			return true, nil
+			return region, nil
 		}
 	}
 
-	return false, nil
+	return "", nil
 }

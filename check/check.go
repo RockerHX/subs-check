@@ -29,13 +29,13 @@ import (
 type Result struct {
 	Proxy      map[string]any
 	Openai     bool
-	Youtube    bool
+	Youtube    string
 	Netflix    bool
 	Google     bool
 	Cloudflare bool
 	Disney     bool
 	Gemini     bool
-	TikTok     bool
+	TikTok     string
 	IP         string
 	IPRisk     string
 	Country    string
@@ -226,8 +226,8 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 					res.Openai = true
 				}
 			case "youtube":
-				if ok, _ := platform.CheckYoutube(httpClient.Client); ok {
-					res.Youtube = true
+				if region, _ := platform.CheckYoutube(httpClient.Client); region != "" {
+					res.Youtube = region
 				}
 			case "netflix":
 				if ok, _ := platform.CheckNetflix(httpClient.Client); ok {
@@ -256,8 +256,8 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 					slog.Debug(fmt.Sprintf("查询IP风险失败: %v", err))
 				}
 			case "tiktok":
-				if ok, _ := platform.CheckTikTok(httpClient.Client); ok {
-					res.TikTok = true
+				if region, _ := platform.CheckTikTok(httpClient.Client); region != "" {
+					res.TikTok = region
 				}
 			}
 		}
@@ -298,29 +298,29 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 
 	if config.GlobalConfig.MediaCheck {
 		// 移除已有的标记（IPRisk和平台标记）
-		name = regexp.MustCompile(`\s*\|(?:Netflix|Disney|Youtube|Openai|Gemini|\d+%)`).ReplaceAllString(name, "")
+		name = regexp.MustCompile(`\s*\|(?:NF|D\+|GPT|GM|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
 	}
 	// 添加其他标记
 	if res.IPRisk != "" {
 		tags = append(tags, res.IPRisk)
 	}
 	if res.Netflix {
-		tags = append(tags, "Netflix")
+		tags = append(tags, "NF")
 	}
 	if res.Disney {
-		tags = append(tags, "Disney")
-	}
-	if res.Youtube {
-		tags = append(tags, "Youtube")
+		tags = append(tags, "D+")
 	}
 	if res.Openai {
-		tags = append(tags, "Openai")
+		tags = append(tags, "GPT")
 	}
 	if res.Gemini {
-		tags = append(tags, "Gemini")
+		tags = append(tags, "GM")
 	}
-	if res.TikTok {
-		tags = append(tags, "TikTok")
+	if res.Youtube != "" {
+		tags = append(tags, fmt.Sprintf("YT-%s", res.Youtube))
+	}
+	if res.TikTok != "" {
+		tags = append(tags, fmt.Sprintf("TK-%s", res.TikTok))
 	}
 
 	// 将所有标记添加到名称中
@@ -473,7 +473,6 @@ func CreateClient(mapping map[string]any) *ProxyClient {
 				DstPort: u16Port,
 			})
 		},
-		IdleConnTimeout:   time.Duration(config.GlobalConfig.Timeout) * time.Millisecond,
 		DisableKeepAlives: true,
 	}
 
