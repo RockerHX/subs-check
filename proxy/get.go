@@ -3,11 +3,11 @@ package proxies
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	u "net/url"
 	"sync"
 	"time"
-
-	"log/slog"
 
 	"github.com/beck-8/subs-check/config"
 	"github.com/beck-8/subs-check/utils"
@@ -47,6 +47,11 @@ func GetProxies() ([]map[string]any, error) {
 				return
 			}
 
+			var tag string
+			if d, err := u.Parse(url); err == nil {
+				tag = d.Fragment
+			}
+
 			var con map[string]any
 			err = yaml.Unmarshal(data, &con)
 			if err != nil {
@@ -57,8 +62,9 @@ func GetProxies() ([]map[string]any, error) {
 				}
 				slog.Debug(fmt.Sprintf("获取订阅链接: %s，有效节点数量: %d", url, len(proxyList)))
 				for _, proxy := range proxyList {
-					// 为每个节点添加订阅链接来源信息
-					proxy["subscription_url"] = url
+					// 为每个节点添加订阅链接来源信息和备注
+					proxy["sub_url"] = url
+					proxy["sub_tag"] = tag
 					proxyChan <- proxy
 				}
 				return
@@ -86,8 +92,9 @@ func GetProxies() ([]map[string]any, error) {
 							delete(proxyMap, "obfs_password")
 						}
 					}
-					// 为每个节点添加订阅链接来源信息
-					proxyMap["subscription_url"] = url
+					// 为每个节点添加订阅链接来源信息和备注
+					proxyMap["sub_url"] = url
+					proxyMap["sub_tag"] = tag
 					proxyChan <- proxyMap
 				}
 			}

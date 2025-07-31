@@ -301,7 +301,7 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 
 	if config.GlobalConfig.MediaCheck {
 		// 移除已有的标记（IPRisk和平台标记）
-		name = regexp.MustCompile(`\s*\|(?:NF|D\+|GPT|GM|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
+		name = regexp.MustCompile(`\s*\|(?:NF|D\+|GPT⁺|GPT|GM|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
 	}
 
 	// 按用户输入顺序定义
@@ -340,9 +340,13 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 		}
 	}
 
+	if tag := res.Proxy["sub_tag"].(string); tag != "" {
+		tags = append(tags, tag)
+	}
+
 	// 将所有标记添加到名称中
 	if len(tags) > 0 {
-		name += " |" + strings.Join(tags, "|")
+		name += "|" + strings.Join(tags, "|")
 	}
 
 	res.Proxy["name"] = name
@@ -421,7 +425,7 @@ func (pc *ProxyChecker) checkSubscriptionSuccessRate(allProxies []map[string]any
 
 	// 统计所有节点的订阅来源
 	for _, proxy := range allProxies {
-		if subUrl, ok := proxy["subscription_url"].(string); ok {
+		if subUrl, ok := proxy["sub_url"].(string); ok {
 			stats := subStats[subUrl]
 			stats.total++
 			subStats[subUrl] = stats
@@ -431,12 +435,13 @@ func (pc *ProxyChecker) checkSubscriptionSuccessRate(allProxies []map[string]any
 	// 统计成功节点的订阅来源
 	for _, result := range pc.results {
 		if result.Proxy != nil {
-			if subUrl, ok := result.Proxy["subscription_url"].(string); ok {
+			if subUrl, ok := result.Proxy["sub_url"].(string); ok {
 				stats := subStats[subUrl]
 				stats.success++
 				subStats[subUrl] = stats
 			}
-			delete(result.Proxy, "subscription_url")
+			delete(result.Proxy, "sub_url")
+			delete(result.Proxy, "sub_tag")
 		}
 	}
 
