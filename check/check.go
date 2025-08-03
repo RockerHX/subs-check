@@ -340,7 +340,7 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 		}
 	}
 
-	if tag := res.Proxy["sub_tag"].(string); tag != "" {
+	if tag, ok := res.Proxy["sub_tag"].(string); ok && tag != "" {
 		tags = append(tags, tag)
 	}
 
