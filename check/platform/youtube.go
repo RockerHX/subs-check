@@ -44,5 +44,10 @@ func CheckYoutube(httpClient *http.Client) (string, error) {
 		}
 	}
 
+	// 送中
+	if idx := strings.Index(string(body), "www.google.cn"); idx != -1 {
+		return "CN", nil
+	}
+
 	return "", nil
 }
