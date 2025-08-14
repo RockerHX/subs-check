@@ -64,6 +64,12 @@ func (app *App) Initialize() error {
 		return fmt.Errorf("初始化配置文件监听失败: %w", err)
 	}
 
+	// 从配置文件中读取代理，设置代理
+	if config.GlobalConfig.Proxy != "" {
+		os.Setenv("HTTP_PROXY", config.GlobalConfig.Proxy)
+		os.Setenv("HTTPS_PROXY", config.GlobalConfig.Proxy)
+	}
+
 	app.interval = config.GlobalConfig.CheckInterval
 
 	if config.GlobalConfig.ListenPort != "" {
