@@ -3,6 +3,7 @@ WORKDIR /app
 COPY . .
 ARG GITHUB_SHA
 ARG VERSION
+SHELL ["/bin/bash", "-c"]
 RUN echo "Building commit: ${GITHUB_SHA:0:7}" && \
     go mod tidy && \
     go build -ldflags="-s -w -X main.Version=${VERSION} -X main.CurrentCommit=${GITHUB_SHA:0:7}" -trimpath -o subs-check .
