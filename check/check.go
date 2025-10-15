@@ -199,12 +199,7 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 	}
 	defer httpClient.Close()
 
-	cloudflare, err := platform.CheckCloudflare(httpClient.Client)
-	if err != nil || !cloudflare {
-		return nil
-	}
-
-	google, err := platform.CheckGoogle(httpClient.Client)
+	google, err := platform.CheckAlive(httpClient.Client)
 	if err != nil || !google {
 		return nil
 	}
