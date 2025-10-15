@@ -23,8 +23,8 @@ import (
 func GetProxies() ([]map[string]any, error) {
 
 	// 解析本地与远程订阅清单
-	subUrls := resolveSubUrls()
-	slog.Info("订阅链接数量", "本地", len(config.GlobalConfig.SubUrls), "远程", len(config.GlobalConfig.SubUrlsRemote), "总计", len(subUrls))
+	subUrls, localNum, remoteNum := resolveSubUrls()
+	slog.Info("订阅链接数量", "本地", localNum, "远程", remoteNum, "总计", len(subUrls))
 
 	if len(config.GlobalConfig.NodeType) > 0 {
 		slog.Info("只筛选用户设置的协议", "type", config.GlobalConfig.NodeType)
@@ -136,7 +136,11 @@ func GetProxies() ([]map[string]any, error) {
 
 // from 3k
 // resolveSubUrls 合并本地与远程订阅清单并去重
-func resolveSubUrls() []string {
+func resolveSubUrls() ([]string, int, int) {
+	// 计数
+	var localNum, remoteNum int
+	localNum = len(config.GlobalConfig.SubUrls)
+
 	urls := make([]string, 0, len(config.GlobalConfig.SubUrls))
 	// 本地配置
 	urls = append(urls, config.GlobalConfig.SubUrls...)
@@ -147,6 +151,7 @@ func resolveSubUrls() []string {
 			if remote, err := fetchRemoteSubUrls(utils.WarpUrl(d)); err != nil {
 				slog.Warn("获取远程订阅清单失败，已忽略", "err", err)
 			} else {
+				remoteNum += len(remote)
 				urls = append(urls, remote...)
 			}
 		}
@@ -167,7 +172,7 @@ func resolveSubUrls() []string {
 		seen[s] = struct{}{}
 		out = append(out, s)
 	}
-	return out
+	return out, localNum, remoteNum
 }
 
 // fetchRemoteSubUrls 从远程地址读取订阅URL清单
