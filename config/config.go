@@ -33,6 +33,7 @@ type Config struct {
 	SubUrlsReTry         int      `yaml:"sub-urls-retry"`
 	SubUrlsRetryInterval int      `yaml:"sub-urls-retry-interval"`
 	SubUrlsTimeout       int      `yaml:"sub-urls-timeout"`
+	SubUrlsGetUA         string   `yaml:"sub-urls-get-ua"`
 	SubUrlsRemote        []string `yaml:"sub-urls-remote"`
 	SubUrls              []string `yaml:"sub-urls"`
 	SuccessRate          float32  `yaml:"success-rate"`
@@ -71,6 +72,7 @@ var GlobalConfig = &Config{
 	Platforms:          []string{"openai", "youtube", "netflix", "disney", "gemini", "iprisk"},
 	DownloadMB:         20,
 	AliveTestUrl:       "http://gstatic.com/generate_204",
+	SubUrlsGetUA:       "clash.meta (https://github.com/beck-8/subs-check)",
 }
 
 //go:embed config.example.yaml

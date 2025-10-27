@@ -252,7 +252,11 @@ func GetDateFromSubs(subUrl string) ([]byte, error) {
 			continue
 		}
 
-		req.Header.Set("User-Agent", "clash.meta")
+		if config.GlobalConfig.SubUrlsGetUA == "random" {
+			req.Header.Set("User-Agent", convert.RandUserAgent())
+		} else {
+			req.Header.Set("User-Agent", config.GlobalConfig.SubUrlsGetUA)
+		}
 
 		resp, err := client.Do(req)
 		if err != nil {
