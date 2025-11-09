@@ -205,7 +205,7 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 
 	var speed int
 	if config.GlobalConfig.SpeedTestUrl != "" {
-		speed, _, err = platform.CheckSpeed(httpClient.Client, Bucket)
+		speed, _, err = platform.CheckSpeed(httpClient.Client, Bucket, httpClient.BytesRead)
 		if err != nil || speed < config.GlobalConfig.MinSpeed {
 			return nil
 		}
@@ -465,15 +465,22 @@ func (pc *ProxyChecker) checkSubscriptionSuccessRate(allProxies []map[string]any
 	}
 }
 
-// statsConn wraps net.Conn to count bytes read
+// statsConn wraps net.Conn to count bytes read and apply rate limiting
 type statsConn struct {
 	net.Conn
 	bytesRead *uint64
+	bucket    *ratelimit.Bucket
 }
 
 func (c *statsConn) Read(b []byte) (n int, err error) {
+	// 速度限制（全局）
+	if c.bucket != nil {
+		c.bucket.Wait(int64(len(b)))
+	}
+
 	n, err = c.Conn.Read(b)
 	atomic.AddUint64(c.bytesRead, uint64(n))
+
 	return n, err
 }
 
@@ -512,6 +519,7 @@ func CreateClient(mapping map[string]any) *ProxyClient {
 			return &statsConn{
 				Conn:      conn,
 				bytesRead: &bytesRead,
+				bucket:    Bucket,
 			}, nil
 		},
 		DisableKeepAlives: true,
