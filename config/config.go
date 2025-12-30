@@ -63,6 +63,7 @@ type Config struct {
 	GithubProxy          string   `yaml:"github-proxy"`
 	Proxy                string   `yaml:"proxy"`
 	CallbackScript       string   `yaml:"callback-script"`
+	Filter               []string `yaml:"filter"`
 }
 
 var GlobalConfig = &Config{

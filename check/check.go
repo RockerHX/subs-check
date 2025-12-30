@@ -166,7 +166,10 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	// 检查订阅成功率并发出警告
 	pc.checkSubscriptionSuccessRate(proxies)
 
-	return pc.results, nil
+	// 应用节点名称过滤规则
+	filteredResults := FilterResults(pc.results)
+
+	return filteredResults, nil
 }
 
 // worker 处理单个代理检测的工作线程
