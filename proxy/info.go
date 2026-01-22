@@ -19,7 +19,11 @@ func GetProxyCountry(httpClient *http.Client) (loc string, ip string) {
 		if loc != "" && ip != "" {
 			return
 		}
-		loc, ip = GetIPLark(httpClient)
+		loc, ip = GetIpinfo(httpClient)
+		if loc != "" && ip != "" {
+			return
+		}
+		loc, ip = GetIPSB(httpClient)
 		if loc != "" && ip != "" {
 			return
 		}
@@ -119,41 +123,41 @@ func GetCFProxy(httpClient *http.Client) (loc string, ip string) {
 	return
 }
 
-func GetIPLark(httpClient *http.Client) (loc string, ip string) {
+func GetIPSB(httpClient *http.Client) (loc string, ip string) {
 	type GeoIPData struct {
 		IP      string `json:"ip"`
 		Country string `json:"country_code"`
 	}
 
-	url := string([]byte{104, 116, 116, 112, 115, 58, 47, 47, 102, 51, 98, 99, 97, 48, 101, 50, 56, 101, 54, 98, 46, 97, 97, 112, 113, 46, 110, 101, 116, 47, 105, 112, 97, 112, 105, 47, 105, 112, 99, 97, 116})
+	url := "https://api.ip.sb/geoip"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("创建请求失败: %s", err))
 		return
 	}
-	req.Header.Set("User-Agent", "curl/8.7.1")
+	req.Header.Set("User-Agent", convert.RandUserAgent())
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("iplark获取节点位置失败: %s", err))
+		slog.Debug(fmt.Sprintf("ip.sb获取节点位置失败: %s", err))
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		slog.Debug(fmt.Sprintf("iplark返回非200状态码: %v", resp.StatusCode))
+		slog.Debug(fmt.Sprintf("ip.sb返回非200状态码: %v", resp.StatusCode))
 		return
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("iplark读取节点位置失败: %s", err))
+		slog.Debug(fmt.Sprintf("ip.sb读取节点位置失败: %s", err))
 		return
 	}
 
 	var geo GeoIPData
 	err = json.Unmarshal(body, &geo)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("解析iplark JSON 失败: %v", err))
+		slog.Debug(fmt.Sprintf("解析ip.sb JSON 失败: %v", err))
 		return
 	}
 
@@ -195,6 +199,49 @@ func GetMe(httpClient *http.Client) (loc string, ip string) {
 	err = json.Unmarshal(body, &geo)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("解析me JSON 失败: %v", err))
+		return
+	}
+
+	return geo.Country, geo.IP
+}
+
+func GetIpinfo(httpClient *http.Client) (loc string, ip string) {
+	type GeoIPData struct {
+		IP      string `json:"ip"`
+		Country string `json:"country_code"`
+	}
+
+	url := string([]byte{104, 116, 116, 112, 115, 58, 47, 47, 97, 112, 105, 46, 105, 112,
+		105, 110, 102, 111, 46, 105, 111, 47, 108, 105, 116, 101, 47, 109, 101, 63, 116,
+		111, 107, 101, 110, 61, 48, 57, 48, 102, 54, 54, 55, 55, 57, 55, 51, 51, 98, 102})
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("创建请求失败: %s", err))
+		return
+	}
+	req.Header.Set("User-Agent", "subs-check (https://github.com/beck-8/subs-check)")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("Ipinfo获取节点位置失败: %s", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Debug(fmt.Sprintf("Ipinfo返回非200状态码: %v", resp.StatusCode))
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("Ipinfo读取节点位置失败: %s", err))
+		return
+	}
+
+	var geo GeoIPData
+	err = json.Unmarshal(body, &geo)
+	if err != nil {
+		slog.Debug(fmt.Sprintf("解析Ipinfo JSON 失败: %v", err))
 		return
 	}
 
