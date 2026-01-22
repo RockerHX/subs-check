@@ -33,7 +33,7 @@ type Result struct {
 	Google     bool
 	Cloudflare bool
 	Disney     bool
-	Gemini     bool
+	Gemini     string
 	TikTok     string
 	IP         string
 	IPRisk     string
@@ -248,8 +248,8 @@ func (pc *ProxyChecker) checkProxy(proxy map[string]any) *Result {
 					res.Disney = true
 				}
 			case "gemini":
-				if ok, _ := platform.CheckGemini(mediaClient); ok {
-					res.Gemini = true
+				if region, _ := platform.CheckGemini(mediaClient); region != "" {
+					res.Gemini = region
 				}
 			case "iprisk":
 				country, ip := proxyutils.GetProxyCountry(mediaClient)
@@ -329,8 +329,8 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 				tags = append(tags, "D+")
 			}
 		case "gemini":
-			if res.Gemini {
-				tags = append(tags, "GM")
+			if res.Gemini != "" {
+				tags = append(tags, fmt.Sprintf("GM-%s", res.Gemini))
 			}
 		case "iprisk":
 			if res.IPRisk != "" {
