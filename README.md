@@ -160,7 +160,7 @@ go run . -f ./config/config.yaml
 
 1. 点击[**此处**](https://vercel.com/new/clone?repository-url=https://github.com/beck-8/apprise_vercel)部署 Apprise。
 2. 部署后获取 API 链接，如 `https://testapprise-beck8s-projects.vercel.app/notify`。
-3. 建议为 Vercel 项目设置自定义域名（国内访问 Vercel 可能受限）。
+3. 建议为 Vercel 项目设置自定义域名`diydomain.com`（国内访问 Vercel 可能受限）。
 
 ### 🐳 Docker 部署
 
@@ -184,7 +184,7 @@ docker run --name apprise \
 ```yaml
 # 填写搭建的apprise API server 地址
 # https://notify.xxxx.us.kg/notify
-apprise-api-server: ""
+apprise-api-server: "https://diydomain.com/notify"
 # 填写通知目标
 # 支持100+ 个通知渠道，详细格式请参照 https://github.com/caronc/apprise
 recipient-url: 
