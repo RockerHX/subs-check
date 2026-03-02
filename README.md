@@ -54,6 +54,9 @@ bash <(wget -qO- https://raw.githubusercontent.com/beck-8/subs-check/master/inst
 
 # 如果无法访问 GitHub，可使用代理
 bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+
+# Alpine 等无 bash 环境
+wget -qO /tmp/install.sh https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
 ```
 
 <details>
