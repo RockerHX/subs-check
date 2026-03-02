@@ -178,7 +178,7 @@ StartLimitIntervalSec=60
 Type=simple
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=${INSTALL_DIR}/${BINARY_NAME}
-Restart=on-failure
+Restart=always
 RestartSec=10
 LimitNOFILE=65535
 
@@ -259,6 +259,14 @@ print_info() {
         printf "\n"
         printf "  卸载方法:\n"
         printf "    rm -rf %s\n" "$INSTALL_DIR"
+    fi
+    printf "\n"
+    printf "${YELLOW}  如需修改参数，请编辑配置文件：${NC}\n"
+    printf "    %s/config/config.yaml\n" "$INSTALL_DIR"
+    if [ "$HAS_SYSTEMD" -eq 1 ]; then
+        printf "  修改后重启服务：systemctl restart %s\n" "$SERVICE_NAME"
+    else
+        printf "  修改后重新运行程序即可生效\n"
     fi
     printf "\n"
 }
