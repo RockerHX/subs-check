@@ -171,6 +171,8 @@ setup_systemd() {
 [Unit]
 Description=Subs Check - 订阅检测转换工具
 After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
 
 [Service]
 Type=simple
