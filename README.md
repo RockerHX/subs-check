@@ -43,6 +43,49 @@
 ## 🛠️ 部署与使用 
 > 首次运行会在当前目录生成默认配置文件。
 
+### 🚀 一键安装（Linux）
+
+```bash
+# 默认安装
+bash <(curl -fsSL https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+
+# 使用 wget
+bash <(wget -qO- https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+
+# 如果无法访问 GitHub，可使用代理
+bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+```
+
+<details>
+  <summary>脚本说明</summary>
+
+安装脚本会自动执行以下操作：
+1. 检测系统架构（x86_64 / aarch64 / armv7 / i386）
+2. 从 GitHub Releases 下载最新版本
+3. 安装到 `/opt/subs-check` 目录
+4. 配置 systemd 服务
+5. 交互式选择是否开机自启动
+6. 交互式选择是否立即启动
+
+**服务管理：**
+```bash
+systemctl start subs-check    # 启动
+systemctl stop subs-check     # 停止
+systemctl restart subs-check  # 重启
+systemctl status subs-check   # 状态
+journalctl -u subs-check -f   # 日志
+```
+
+**卸载方法：**
+```bash
+systemctl stop subs-check
+systemctl disable subs-check
+rm -rf /opt/subs-check /etc/systemd/system/subs-check.service
+systemctl daemon-reload
+```
+
+</details>
+
 ### 🪜 代理设置（可选）
 <details>
   <summary>展开查看</summary>
@@ -86,6 +129,7 @@ speed-test-url: https://custom-domain/speedtest?bytes=104857600
 # 1GB
 speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 ```
+
 </details>
 
 ### 🐳 Docker 运行
