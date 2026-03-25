@@ -6,14 +6,13 @@ require (
 	github.com/biter777/countries v1.7.5
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-gonic/gin v1.10.1
-	github.com/metacubex/mihomo v1.19.20
+	github.com/metacubex/mihomo v1.19.21
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/robfig/cron/v3 v3.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/dunglas/httpsfv v1.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
@@ -25,7 +24,8 @@ require (
 	github.com/metacubex/bart v0.26.0 // indirect
 	github.com/metacubex/blake3 v0.1.0 // indirect
 	github.com/metacubex/connect-ip-go v0.0.0-20260128031117-1cad62060727 // indirect
-	github.com/metacubex/cpu v0.1.0 // indirect
+	github.com/metacubex/cpu v0.1.1 // indirect
+	github.com/metacubex/edwards25519 v1.2.0 // indirect
 	github.com/metacubex/fswatch v0.1.1 // indirect
 	github.com/metacubex/hkdf v0.1.0 // indirect
 	github.com/metacubex/hpke v0.1.0 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/coreos/go-iptables v0.8.0 // indirect
 	github.com/docker/go-units v0.5.0
 	github.com/ebitengine/purego v0.9.1 // indirect
-	github.com/enfein/mieru/v3 v3.26.2 // indirect
+	github.com/enfein/mieru/v3 v3.29.0 // indirect
 	github.com/ericlagergren/aegis v0.0.0-20250325060835-cd0defd64358 // indirect
 	github.com/ericlagergren/polyval v0.0.0-20230805202542-18692a1b76f9 // indirect
 	github.com/ericlagergren/siv v0.0.0-20220507050439-0b757b3aa5f1 // indirect
@@ -97,7 +97,7 @@ require (
 	github.com/metacubex/chacha v0.1.5 // indirect
 	github.com/metacubex/gopacket v1.1.20-0.20230608035415-7e2f98a3e759 // indirect
 	github.com/metacubex/gvisor v0.0.0-20251227095601-261ec1326fe8 // indirect
-	github.com/metacubex/quic-go v0.59.1-0.20260128071132-0f3233b973af // indirect
+	github.com/metacubex/quic-go v0.59.1-0.20260213014310-4df8f0de5b56 // indirect
 	github.com/metacubex/randv2 v0.2.0 // indirect
 	github.com/metacubex/sing-quic v0.0.0-20260112044712-65d17608159e // indirect
 	github.com/metacubex/sing-shadowsocks v0.2.12 // indirect
@@ -116,7 +116,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/samber/lo v1.52.0
+	github.com/samber/lo v1.53.0
 	github.com/shirou/gopsutil/v4 v4.25.8
 	github.com/sina-ghaderi/poly1305 v0.0.0-20220724002748-c5926b03988b // indirect
 	github.com/sina-ghaderi/rabaead v0.0.0-20220730151906-ab6e06b96e8c // indirect
