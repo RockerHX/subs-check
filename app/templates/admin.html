@@ -811,8 +811,13 @@
             });
         }
 
+        function escapeHtml(str) {
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
         // 为日志添加颜色
         function colorizeLog(log) {
+            log = escapeHtml(log);
             log = log.replace(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/, '<span class="log-time">$1</span>');
             log = log.replace(/\bINF\b/, '<span class="log-info">INF</span>');
             log = log.replace(/\bERR\b/, '<span class="log-error">ERR</span>');
