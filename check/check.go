@@ -65,6 +65,34 @@ var ProxyCount atomic.Uint32
 var TotalBytes atomic.Uint64
 var Phase atomic.Uint32 // 0=idle, 1=alive, 2=speed, 3=media
 
+// PhaseResult 保存单个阶段的最终结果
+type PhaseResult struct {
+	Available uint32 `json:"available"`
+	Total     uint32 `json:"total"`
+}
+
+// PhaseResults 保存各阶段最终结果，供前端展示历史数据
+var PhaseResults [4]atomic.Pointer[PhaseResult] // index 1-3 对应三个阶段
+
+func SavePhaseResult(phase int, available, total uint32) {
+	if phase >= 1 && phase <= 3 {
+		PhaseResults[phase].Store(&PhaseResult{Available: available, Total: total})
+	}
+}
+
+func GetPhaseResult(phase int) *PhaseResult {
+	if phase >= 1 && phase <= 3 {
+		return PhaseResults[phase].Load()
+	}
+	return nil
+}
+
+func ResetPhaseResults() {
+	for i := 1; i <= 3; i++ {
+		PhaseResults[i].Store(nil)
+	}
+}
+
 var ForceClose atomic.Bool
 var progressPaused atomic.Bool
 var progressRendered atomic.Bool
@@ -134,6 +162,8 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	slog.Info("开始检测节点")
 	slog.Info("当前参数", "timeout", config.GlobalConfig.Timeout, "concurrent", config.GlobalConfig.Concurrent, "speed-concurrent", config.GlobalConfig.SpeedConcurrent, "media-concurrent", config.GlobalConfig.MediaConcurrent, "enable-speedtest", config.GlobalConfig.SpeedTestUrl != "", "min-speed", config.GlobalConfig.MinSpeed, "download-timeout", config.GlobalConfig.DownloadTimeout, "download-mb", config.GlobalConfig.DownloadMB, "total-speed-limit", config.GlobalConfig.TotalSpeedLimit)
 
+	ResetPhaseResults()
+
 	done := make(chan bool)
 	if config.GlobalConfig.PrintProgress {
 		go pc.showProgress(done)
@@ -150,6 +180,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	// 没有测速阶段时，SuccessLimit 在测活阶段生效
 	aliveResults := pc.runAlivePhase(proxies, aliveConcurrency, !hasSpeedTest)
 	pauseProgress()
+	SavePhaseResult(1, Available.Load(), ProxyCount.Load())
 	slog.Info(fmt.Sprintf("存活节点数量: %d", len(aliveResults)))
 
 	// === Phase 2: 测速 (可选) ===
@@ -163,6 +194,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 		resumeProgress()
 		speedResults = pc.runSpeedPhase(aliveResults, speedConcurrency)
 		pauseProgress()
+		SavePhaseResult(2, Available.Load(), ProxyCount.Load())
 		slog.Info(fmt.Sprintf("测速通过节点数量: %d", len(speedResults)))
 	} else {
 		// 无测速：直接转换
@@ -181,6 +213,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 		resumeProgress()
 		pc.results = pc.runMediaPhase(speedResults, mediaConcurrency)
 		pauseProgress()
+		SavePhaseResult(3, Available.Load(), ProxyCount.Load())
 	}
 
 	if config.GlobalConfig.PrintProgress {

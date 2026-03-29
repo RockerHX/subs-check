@@ -154,12 +154,17 @@ func (app *App) updateConfig(c *gin.Context) {
 
 // getStatus 获取应用状态
 func (app *App) getStatus(c *gin.Context) {
+	phaseResults := make(map[string]*check.PhaseResult, 3)
+	for i := 1; i <= 3; i++ {
+		phaseResults[fmt.Sprintf("%d", i)] = check.GetPhaseResult(i)
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"checking":   app.checking.Load(),
-		"proxyCount": check.ProxyCount.Load(),
-		"available":  check.Available.Load(),
-		"progress":   check.Progress.Load(),
-		"phase":      check.Phase.Load(),
+		"checking":     app.checking.Load(),
+		"proxyCount":   check.ProxyCount.Load(),
+		"available":    check.Available.Load(),
+		"progress":     check.Progress.Load(),
+		"phase":        check.Phase.Load(),
+		"phaseResults": phaseResults,
 	})
 }
 
