@@ -8,6 +8,8 @@ github.com/andybalholm/brotli v1.2.0 h1:ukwgCxwYrmACq68yiUqwIWnGY0cTPox/M94sVwTo
 github.com/andybalholm/brotli v1.2.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
+github.com/beck-8/mihomo v1.19.11-0.20260329035928-b19e411d37da h1:TQ2yiE5r/8UPLqI1OuGU8pANEKJE78rm/A+2h+JvWag=
+github.com/beck-8/mihomo v1.19.11-0.20260329035928-b19e411d37da/go.mod h1:pzCP4xV9RNdX0muRwcaQoY8ydD1AXhtyKl/PYm5fzFY=
 github.com/biter777/countries v1.7.5 h1:MJ+n3+rSxWQdqVJU8eBy9RqcdH6ePPn4PJHocVWUa+Q=
 github.com/biter777/countries v1.7.5/go.mod h1:1HSpZ526mYqKJcpT5Ti1kcGQ0L0SrXWIaptUWjFfv2E=
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
@@ -158,8 +160,6 @@ github.com/metacubex/http v0.1.0 h1:Jcy0I9zKjYijSUaksZU34XEe2xNdoFkgUTB7z7K5q0o=
 github.com/metacubex/http v0.1.0/go.mod h1:Nxx0zZAo2AhRfanyL+fmmK6ACMtVsfpwIl1aFAik2Eg=
 github.com/metacubex/kcp-go v0.0.0-20260105040817-550693377604 h1:hJwCVlE3ojViC35MGHB+FBr8TuIf3BUFn2EQ1VIamsI=
 github.com/metacubex/kcp-go v0.0.0-20260105040817-550693377604/go.mod h1:lpmN3m269b3V5jFCWtffqBLS4U3QQoIid9ugtO+OhVc=
-github.com/metacubex/mihomo v1.19.21 h1:1VNlN124abEZQyRVc1u7vmFAxsm5p/u753EY2Gb/hac=
-github.com/metacubex/mihomo v1.19.21/go.mod h1:6MgQnQfKgHAnZ/ThGfD2qNO5b9Q0i4oxiARYaVo2syI=
 github.com/metacubex/mlkem v0.1.0 h1:wFClitonSFcmipzzQvax75beLQU+D7JuC+VK1RzSL8I=
 github.com/metacubex/mlkem v0.1.0/go.mod h1:amhaXZVeYNShuy9BILcR7P0gbeo/QLZsnqCdL8U2PDQ=
 github.com/metacubex/qpack v0.6.0 h1:YqClGIMOpiRYLjV1qOs483Od08MdPgRnHjt90FuaAKw=

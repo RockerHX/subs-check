@@ -2,6 +2,8 @@ module github.com/beck-8/subs-check
 
 go 1.25.0
 
+replace github.com/metacubex/mihomo => github.com/beck-8/mihomo v1.19.11-0.20260329035928-b19e411d37da
+
 require (
 	github.com/biter777/countries v1.7.5
 	github.com/fsnotify/fsnotify v1.9.0
