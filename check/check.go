@@ -805,8 +805,19 @@ func (pc *ProxyClient) Close() {
 
 	// 即使这里不关闭，底层GC的时候也会自动关闭
 	// 这里及时的关闭，方便内存回收
+	// 某些底层传输协议的 Close 可能阻塞，超时后放弃等待交由 GC 回收
 	if pc.proxy != nil {
-		pc.proxy.Close()
+		proxy := pc.proxy
+		done := make(chan struct{})
+		go func() {
+			proxy.Close()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			slog.Debug(fmt.Sprintf("关闭代理连接超时，交由GC回收: %v", proxy))
+		}
 	}
 	pc.Client = nil
 
