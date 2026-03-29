@@ -2,14 +2,12 @@ module github.com/beck-8/subs-check
 
 go 1.25.0
 
-replace github.com/metacubex/mihomo => github.com/beck-8/mihomo v1.19.11-0.20260329035928-b19e411d37da
-
 require (
 	github.com/biter777/countries v1.7.5
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-contrib/pprof v1.5.4
 	github.com/gin-gonic/gin v1.12.0
-	github.com/metacubex/mihomo v1.19.21
+	github.com/metacubex/mihomo v1.19.22-0.20260329115958-a4ee142f65ba
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/robfig/cron/v3 v3.0.1
 	gopkg.in/yaml.v3 v3.0.1
