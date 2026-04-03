@@ -625,7 +625,7 @@ func (pc *ProxyChecker) showProgress(done chan bool) {
 	phases := map[uint32]phaseInfo{
 		1: {"测活", "存活"},
 		2: {"测速", "通过"},
-		3: {"流媒体", "完成"},
+		3: {"流媒体+重命名", "完成"},
 	}
 	for {
 		select {
