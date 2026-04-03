@@ -18,6 +18,9 @@ type geoResult struct {
 	ip  string
 }
 
+// 这里需要一个不限流的ipv4的非CF的API
+// 因为ipv6在数据库中没有记载时会变成US。
+// 不能用CF的API是因为我们要保留CF的节点（无proxyip的）
 // GetProxyCountry 并行请求所有 IP 查询端点，按优先级返回最优结果
 func GetProxyCountry(httpClient *http.Client) (loc string, ip string) {
 	// 顺序代表优先级，索引越小质量越高
@@ -48,6 +51,7 @@ func GetProxyCountry(httpClient *http.Client) (loc string, ip string) {
 	return
 }
 
+// GetEdgeOneProxy 通过腾讯 EdgeOne 获取地理位置
 func GetEdgeOneProxy(httpClient *http.Client) (loc string, ip string) {
 	type GeoResponse struct {
 		Eo struct {
@@ -93,6 +97,8 @@ func GetEdgeOneProxy(httpClient *http.Client) (loc string, ip string) {
 	return eo.Eo.Geo.CountryCodeAlpha2, eo.Eo.ClientIp
 }
 
+// GetCFProxy 通过 Cloudflare cdn-cgi/trace 获取地理位置
+// 局限：CF 节点需要 proxyip 落地才能访问套 CF 的网站，trace 返回的是 proxyip 落地位置而非节点真实出口位置
 func GetCFProxy(httpClient *http.Client) (loc string, ip string) {
 	url := "https://www.cloudflare.com/cdn-cgi/trace"
 	req, err := http.NewRequest("GET", url, nil)
@@ -131,6 +137,7 @@ func GetCFProxy(httpClient *http.Client) (loc string, ip string) {
 	return
 }
 
+// GetIPSB 通过 ip.sb 获取地理位置
 func GetIPSB(httpClient *http.Client) (loc string, ip string) {
 	type GeoIPData struct {
 		IP      string `json:"ip"`
