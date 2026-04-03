@@ -538,27 +538,46 @@
             3: { name: '流媒体+重命名', countLabel: '完成' }
         };
 
+        // 缓存高频访问的 DOM 元素
+        const dom = {
+            apiKey: document.getElementById('apiKey'),
+            toggleApiKey: document.getElementById('toggleApiKey'),
+            saveApiKey: document.getElementById('saveApiKey'),
+            logs: document.getElementById('logs'),
+            phaseSteps: document.getElementById('phaseSteps'),
+            progressText: document.getElementById('progressText'),
+            progressPercent: document.getElementById('progressPercent'),
+            processPercent: document.getElementById('processPercent'),
+            progressBarTotal: document.getElementById('progressBarTotal'),
+            progressBarSuccess: document.getElementById('progressBarSuccess'),
+            successLabel: document.getElementById('successLabel'),
+            successText: document.getElementById('successText'),
+            statusContainer: document.getElementById('statusContainer'),
+            statusIcon: document.getElementById('statusIcon'),
+            statusText: document.getElementById('nextCheckTime'),
+            versionInfo: document.getElementById('versionInfo'),
+        };
+
         // 初始化API密钥
         const storedApiKey = localStorage.getItem('apiKey') || '';
-        document.getElementById('apiKey').value = storedApiKey;
+        dom.apiKey.value = storedApiKey;
 
         // 切换API密钥可见性
-        document.getElementById('toggleApiKey').addEventListener('click', function() {
-            const apiKeyInput = document.getElementById('apiKey');
+        dom.toggleApiKey.addEventListener('click', function() {
             const icon = this.querySelector('i');
 
-            if (apiKeyInput.type === 'password') {
-                apiKeyInput.type = 'text';
+            if (dom.apiKey.type === 'password') {
+                dom.apiKey.type = 'text';
                 icon.className = 'bi bi-eye';
             } else {
-                apiKeyInput.type = 'password';
+                dom.apiKey.type = 'password';
                 icon.className = 'bi bi-eye-slash';
             }
         });
 
         // 保存API密钥到本地存储
-        document.getElementById('saveApiKey').addEventListener('click', function() {
-            const apiKey = document.getElementById('apiKey').value.trim();
+        dom.saveApiKey.addEventListener('click', function() {
+            const apiKey = dom.apiKey.value.trim();
             localStorage.setItem('apiKey', apiKey);
 
             const button = this;
@@ -783,26 +802,27 @@
                 return response.json();
             })
             .then(data => {
-                const logsContainer = document.getElementById('logs');
                 if (data.error) {
-                    logsContainer.textContent = '加载日志失败: ' + data.error;
+                    dom.logs.textContent = '加载日志失败: ' + data.error;
                 } else {
-                    const isScrolledToBottom = logsContainer.scrollHeight - logsContainer.clientHeight <= logsContainer.scrollTop + 1;
-                    logsContainer.innerHTML = '';
+                    const isScrolledToBottom = dom.logs.scrollHeight - dom.logs.clientHeight <= dom.logs.scrollTop + 1;
+                    const fragment = document.createDocumentFragment();
                     data.logs.forEach(log => {
                         const logLine = document.createElement('div');
                         logLine.innerHTML = colorizeLog(log);
-                        logsContainer.appendChild(logLine);
+                        fragment.appendChild(logLine);
                     });
+                    dom.logs.innerHTML = '';
+                    dom.logs.appendChild(fragment);
                     if (isScrolledToBottom) {
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
+                        dom.logs.scrollTop = dom.logs.scrollHeight;
                     }
                 }
                 return data;
             })
             .catch(error => {
                 if (error.message !== '未授权') {
-                    document.getElementById('logs').textContent = '加载日志失败: ' + error.message;
+                    dom.logs.textContent = '加载日志失败: ' + error.message;
                 }
             });
         }
@@ -812,13 +832,11 @@
         }
 
         // 为日志添加颜色
+        const LOG_LEVEL_CLASS = { INF: 'log-info', ERR: 'log-error', WRN: 'log-warn', DBG: 'log-debug' };
         function colorizeLog(log) {
             log = escapeHtml(log);
             log = log.replace(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/, '<span class="log-time">$1</span>');
-            log = log.replace(/\bINF\b/, '<span class="log-info">INF</span>');
-            log = log.replace(/\bERR\b/, '<span class="log-error">ERR</span>');
-            log = log.replace(/\bWRN\b/, '<span class="log-warn">WRN</span>');
-            log = log.replace(/\bDBG\b/, '<span class="log-debug">DBG</span>');
+            log = log.replace(/\b(INF|ERR|WRN|DBG)\b/, (m) => '<span class="' + LOG_LEVEL_CLASS[m] + '">' + m + '</span>');
             return log;
         }
 
@@ -833,23 +851,25 @@
             });
         });
 
+        // 缓存阶段步骤 DOM 元素
+        const phaseStepEls = [null, document.getElementById('phaseStep1'), document.getElementById('phaseStep2'), document.getElementById('phaseStep3')];
+        const phaseCountEls = [null, document.getElementById('phaseCount1'), document.getElementById('phaseCount2'), document.getElementById('phaseCount3')];
+
         // 更新阶段步骤指示器
         function updatePhaseSteps(phase, available, total, phaseResults) {
-            const stepsContainer = document.getElementById('phaseSteps');
-
             // 检查是否有任何阶段结果
             const hasResults = phaseResults && (phaseResults['1'] || phaseResults['2'] || phaseResults['3']);
 
             if (phase === 0 && !hasResults) {
-                stepsContainer.style.display = 'none';
+                dom.phaseSteps.style.display = 'none';
                 return;
             }
 
-            stepsContainer.style.display = 'flex';
+            dom.phaseSteps.style.display = 'flex';
 
             for (let i = 1; i <= 3; i++) {
-                const step = document.getElementById('phaseStep' + i);
-                const count = document.getElementById('phaseCount' + i);
+                const step = phaseStepEls[i];
+                const count = phaseCountEls[i];
                 const label = PHASE_LABELS[i] ? PHASE_LABELS[i].countLabel : '';
                 const result = phaseResults ? phaseResults[String(i)] : null;
 
@@ -879,38 +899,41 @@
         function updateProgressBar(total, processed, available, phase, phaseResults) {
             const percentTotal = total > 0 ? (processed / total * 100).toFixed(1) : 0;
 
-            const progressText = document.getElementById('progressText');
-            progressText.textContent = processed + '/' + total;
-
-            const progressPercent = document.getElementById('progressPercent');
-            progressPercent.textContent = percentTotal + '%';
-
-            const progressBarTotal = document.getElementById('progressBarTotal');
-            progressBarTotal.style.width = percentTotal + '%';
+            dom.progressText.textContent = processed + '/' + total;
+            dom.progressPercent.textContent = percentTotal + '%';
+            dom.progressBarTotal.style.width = percentTotal + '%';
 
             const percentSuccess = total > 0 ? (available / total * 100).toFixed(1) : 0;
-
-            const processPercent = document.getElementById('processPercent');
-            processPercent.textContent = percentSuccess + '%';
+            dom.processPercent.textContent = percentSuccess + '%';
 
             // 显示阶段对应的标签
             const label = (phase && PHASE_LABELS[phase]) ? PHASE_LABELS[phase].countLabel : '成功节点';
-            const successLabel = document.getElementById('successLabel');
-            const successTextEl = document.getElementById('successText');
-            if (successLabel && successTextEl) {
-                successLabel.childNodes[0].textContent = label + ': ';
+            if (dom.successLabel && dom.successText) {
+                dom.successLabel.childNodes[0].textContent = label + ': ';
                 if (available > 0) {
-                    successTextEl.innerHTML = '<span class="success-highlight">' + available + '</span>/' + total;
+                    dom.successText.innerHTML = '<span class="success-highlight">' + available + '</span>/' + total;
                 } else {
-                    successTextEl.textContent = available + '/' + total;
+                    dom.successText.textContent = available + '/' + total;
                 }
             }
 
-            const progressBarSuccess = document.getElementById('progressBarSuccess');
-            progressBarSuccess.style.width = percentSuccess + '%';
+            dom.progressBarSuccess.style.width = percentSuccess + '%';
 
             // 更新阶段指示器
             updatePhaseSteps(phase, available, total, phaseResults);
+        }
+
+        // 重置进度条到初始状态
+        function resetProgress() {
+            dom.progressText.textContent = 'N/A';
+            dom.progressPercent.textContent = 'N/A';
+            dom.processPercent.textContent = 'N/A';
+            dom.progressBarTotal.style.width = '0%';
+            dom.progressBarSuccess.style.width = '0%';
+            if (dom.successLabel) {
+                dom.successLabel.childNodes[0].textContent = '成功节点: ';
+                dom.successText.textContent = 'N/A';
+            }
         }
 
         // 更新状态
@@ -924,59 +947,33 @@
             })
             .then(data => {
                 if (data) {
-                    const statusContainer = document.getElementById('statusContainer');
-                    const statusIcon = document.getElementById('statusIcon');
-                    const statusText = document.getElementById('nextCheckTime');
-
                     if (data.checking) {
-                        statusContainer.className = 'text-primary';
-                        statusIcon.className = 'bi bi-arrow-repeat me-1 rotate-animation';
+                        dom.statusContainer.className = 'text-primary';
+                        dom.statusIcon.className = 'bi bi-arrow-repeat me-1 rotate-animation';
                         const phaseName = (data.phase && PHASE_LABELS[data.phase]) ? PHASE_LABELS[data.phase].name : '检测';
-                        statusText.textContent = '正在' + phaseName + '中...';
+                        dom.statusText.textContent = '正在' + phaseName + '中...';
 
                         updateProgressBar(data.proxyCount, data.progress, data.available, data.phase, data.phaseResults);
                     } else {
-                        statusContainer.className = 'text-success';
-                        statusIcon.className = 'bi bi-check-circle me-1';
-                        statusText.textContent = '空闲';
+                        dom.statusContainer.className = 'text-success';
+                        dom.statusIcon.className = 'bi bi-check-circle me-1';
+                        dom.statusText.textContent = '空闲';
 
-                        // 空闲时用后端的阶段结果展示上次检测数据
                         updatePhaseSteps(0, 0, 0, data.phaseResults);
-
-                        document.getElementById('progressText').textContent = 'N/A';
-                        document.getElementById('progressPercent').textContent = 'N/A';
-                        document.getElementById('processPercent').textContent = 'N/A';
-                        document.getElementById('progressBarTotal').style.width = '0%';
-                        document.getElementById('progressBarSuccess').style.width = '0%';
-
-                        const successLabel = document.getElementById('successLabel');
-                        if (successLabel) {
-                            successLabel.childNodes[0].textContent = '成功节点: ';
-                            document.getElementById('successText').textContent = 'N/A';
-                        }
+                        resetProgress();
                     }
                 }
             })
             .catch(error => {
                 console.error('获取状态失败:', error);
-                const statusContainer = document.getElementById('statusContainer');
-                const statusIcon = document.getElementById('statusIcon');
-                const statusText = document.getElementById('nextCheckTime');
-
-                statusContainer.className = 'text-danger';
-                statusIcon.className = 'bi bi-exclamation-triangle me-1';
-                statusText.textContent = '获取状态失败';
-
-                document.getElementById('progressText').textContent = 'N/A';
-                document.getElementById('progressPercent').textContent = 'N/A';
-                document.getElementById('processPercent').textContent = 'N/A';
-                document.getElementById('progressBarTotal').style.width = '0%';
-                document.getElementById('progressBarSuccess').style.width = '0%';
+                dom.statusContainer.className = 'text-danger';
+                dom.statusIcon.className = 'bi bi-exclamation-triangle me-1';
+                dom.statusText.textContent = '获取状态失败';
+                resetProgress();
             });
         }
 
         // 初始加载
-        loadConfig();
         updateStatus();
         loadLogs();
 
@@ -984,7 +981,7 @@
         const apiKey = localStorage.getItem('apiKey');
         if (!apiKey) {
             alert('请先输入API密钥以使用本系统');
-            document.getElementById('apiKey').focus();
+            dom.apiKey.focus();
         }
 
         // 定时刷新
@@ -999,19 +996,17 @@
             .then(response => response.json())
             .then(data => {
                 if (data && data.version) {
-                    document.getElementById('versionInfo').textContent = '版本: ' + data.version;
+                    dom.versionInfo.textContent = '版本: ' + data.version;
                 }
             })
             .catch(error => {
                 console.error('获取版本信息失败:', error);
-                document.getElementById('versionInfo').textContent = '版本: 未知';
+                dom.versionInfo.textContent = '版本: 未知';
             });
         }
 
         getVersionInfo();
     </script>
 
-    <!-- YAML解析库 -->
-    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 </body>
 </html>
