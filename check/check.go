@@ -26,15 +26,16 @@ import (
 // Result 存储节点检测结果
 type Result struct {
 	Proxy      map[string]any
-	Openai     bool
-	OpenaiWeb  bool
+	Openai     *platform.OpenAIResult
 	Youtube    string
-	Netflix    bool
+	Netflix    *platform.NetflixResult
 	Google     bool
 	Cloudflare bool
 	Disney     bool
 	Gemini     string
 	TikTok     string
+	Claude     string
+	Spotify    string
 	IP         string
 	IPRisk     string
 	Country    string
@@ -459,12 +460,7 @@ func (pc *ProxyChecker) checkMedia(sr speedResult) *Result {
 				mediaWg.Add(1)
 				go func() {
 					defer mediaWg.Done()
-					cookiesOK, clientOK := platform.CheckOpenAI(mediaClient)
-					if clientOK && cookiesOK {
-						res.Openai = true
-					} else if cookiesOK || clientOK {
-						res.OpenaiWeb = true
-					}
+					res.Openai = platform.CheckOpenAI(mediaClient)
 				}()
 			case "youtube":
 				mediaWg.Add(1)
@@ -478,9 +474,8 @@ func (pc *ProxyChecker) checkMedia(sr speedResult) *Result {
 				mediaWg.Add(1)
 				go func() {
 					defer mediaWg.Done()
-					if ok, _ := platform.CheckNetflix(mediaClient); ok {
-						res.Netflix = true
-					}
+					nf, _ := platform.CheckNetflix(mediaClient)
+					res.Netflix = nf
 				}()
 			case "disney":
 				mediaWg.Add(1)
@@ -496,6 +491,22 @@ func (pc *ProxyChecker) checkMedia(sr speedResult) *Result {
 					defer mediaWg.Done()
 					if region, _ := platform.CheckGemini(mediaClient); region != "" {
 						res.Gemini = region
+					}
+				}()
+			case "claude":
+				mediaWg.Add(1)
+				go func() {
+					defer mediaWg.Done()
+					if region, _ := platform.CheckClaude(mediaClient); region != "" {
+						res.Claude = region
+					}
+				}()
+			case "spotify":
+				mediaWg.Add(1)
+				go func() {
+					defer mediaWg.Done()
+					if region, _ := platform.CheckSpotify(mediaClient); region != "" {
+						res.Spotify = region
 					}
 				}()
 			case "iprisk":
@@ -564,21 +575,39 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 
 	if config.GlobalConfig.MediaCheck {
 		// 移除已有的标记（IPRisk和平台标记）
-		name = regexp.MustCompile(`\s*\|(?:NF|D\+|GPT⁺|GPT|GM|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
+		name = regexp.MustCompile(`\s*\|(?:NF(?:-[A-Z]{2})?|D\+|GPT⁺(?:-[A-Z]{2})?|GPT(?:-[A-Z]{2})?|GM(?:-[A-Z]{2})?|CL(?:-[A-Z]{2})?|SP(?:-[A-Z]{2})?|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
 	}
 
 	// 按用户输入顺序定义
 	for _, plat := range config.GlobalConfig.Platforms {
 		switch plat {
 		case "openai":
-			if res.Openai {
-				tags = append(tags, "GPT⁺")
-			} else if res.OpenaiWeb {
-				tags = append(tags, "GPT")
+			if res.Openai != nil {
+				if res.Openai.Full {
+					if res.Openai.Region != "" {
+						tags = append(tags, fmt.Sprintf("GPT⁺-%s", res.Openai.Region))
+					} else {
+						tags = append(tags, "GPT⁺")
+					}
+				} else if res.Openai.Web {
+					if res.Openai.Region != "" {
+						tags = append(tags, fmt.Sprintf("GPT-%s", res.Openai.Region))
+					} else {
+						tags = append(tags, "GPT")
+					}
+				}
 			}
 		case "netflix":
-			if res.Netflix {
-				tags = append(tags, "NF")
+			if res.Netflix != nil {
+				if res.Netflix.Full {
+					if res.Netflix.Region != "" {
+						tags = append(tags, fmt.Sprintf("NF-%s", res.Netflix.Region))
+					} else {
+						tags = append(tags, "NF")
+					}
+				} else if res.Netflix.OriginalsOnly {
+					tags = append(tags, "NF")
+				}
 			}
 		case "disney":
 			if res.Disney {
@@ -587,6 +616,14 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 		case "gemini":
 			if res.Gemini != "" {
 				tags = append(tags, fmt.Sprintf("GM-%s", res.Gemini))
+			}
+		case "claude":
+			if res.Claude != "" {
+				tags = append(tags, fmt.Sprintf("CL-%s", res.Claude))
+			}
+		case "spotify":
+			if res.Spotify != "" {
+				tags = append(tags, fmt.Sprintf("SP-%s", res.Spotify))
 			}
 		case "iprisk":
 			if res.IPRisk != "" {

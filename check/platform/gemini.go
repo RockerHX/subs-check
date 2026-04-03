@@ -9,6 +9,12 @@ import (
 	"github.com/biter777/countries"
 )
 
+// Gemini 封禁地区列表（三字码）
+var geminiBlockedCodes = map[string]bool{
+	"CHN": true, "RUS": true, "BLR": true, "CUB": true,
+	"IRN": true, "PRK": true, "SYR": true, "HKG": true, "MAC": true,
+}
+
 // alpha3ToAlpha2 使用 countries 库将三字码转换为二字码
 func alpha3ToAlpha2(alpha3 string) string {
 	code := strings.ToUpper(alpha3)
@@ -19,7 +25,8 @@ func alpha3ToAlpha2(alpha3 string) string {
 	return country.Alpha2()
 }
 
-// https://github.com/clash-verge-rev/clash-verge-rev/blob/c894a15d13d5bcce518f8412cc393b56272a9afa/src-tauri/src/cmd/media_unlock_checker.rs#L241
+// CheckGemini 检测 Google Gemini 解锁状态
+// 返回地区二字码（如 "US"），空字符串表示不可用
 func CheckGemini(httpClient *http.Client) (string, error) {
 	req, err := http.NewRequest("GET", "https://gemini.google.com/", nil)
 	if err != nil {
@@ -39,23 +46,23 @@ func CheckGemini(httpClient *http.Client) (string, error) {
 
 	bodyStr := string(body)
 
-	// 检查是否可用
-	if !strings.Contains(bodyStr, "45631641,null,true") {
+	// 提取三字母国家码
+	re := regexp.MustCompile(`,2,1,200,"([A-Z]{3})"`)
+	matches := re.FindStringSubmatch(bodyStr)
+	if len(matches) <= 1 {
 		return "", nil
 	}
 
-	// 使用正则表达式提取国家代码
-	re := regexp.MustCompile(`,2,1,200,"([A-Z]{3})"`)
-	matches := re.FindStringSubmatch(bodyStr)
+	alpha3Code := matches[1]
 
-	if len(matches) > 1 {
-		alpha3Code := matches[1] // 三字码，如 "USA"
-		alpha2Code := alpha3ToAlpha2(alpha3Code)
-		if alpha2Code == "" {
-			return "N/A", nil
-		}
-		return alpha2Code, nil
+	// 检查是否在封禁列表中
+	if geminiBlockedCodes[alpha3Code] {
+		return "", nil
 	}
 
-	return "N/A", nil
+	alpha2Code := alpha3ToAlpha2(alpha3Code)
+	if alpha2Code == "" {
+		return "", nil
+	}
+	return alpha2Code, nil
 }

@@ -75,10 +75,12 @@ filter:
   #
   # === 按平台解锁过滤（需开启 media-check）===
   # - "GPT⁺|GPT"                 # 保留解锁 OpenAI 的节点
-  # - "NF"                       # 保留解锁 Netflix 的节点
+  # - "NF"                       # 保留解锁 Netflix 的节点（NF=仅自制剧, NF-US=全解锁）
   # - "GM"                       # 保留解锁 Gemini 的节点
   # - "D\\+"                     # 保留解锁 Disney+ 的节点
   # - "YT-"                      # 保留解锁 YouTube Premium 的节点
+  # - "CL-"                      # 保留解锁 Claude 的节点
+  # - "SP-"                      # 保留解锁 Spotify 的节点
 
 # 是否开启流媒体检测，其中IP欺诈依赖重命名
 media-check: false
@@ -92,6 +94,8 @@ platforms:
   - disney
   - openai
   - gemini
+  - claude
+  - spotify
 
 # 保留之前测试成功的节点
 # 如果为true，则保留之前测试成功的节点，这样就不会因为上游链接更新，导致可用的节点被清除掉
