@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ type Result struct {
 	IP         string
 	IPRisk     string
 	Country    string
+	Speed      int // KB/s, 0 表示未测速或测速未通过
 }
 
 // aliveResult 存活检测通过的中间结果
@@ -46,11 +46,6 @@ type aliveResult struct {
 	Proxy map[string]any
 }
 
-// speedResult 测速通过的中间结果
-type speedResult struct {
-	Proxy map[string]any
-	Speed int
-}
 
 // ProxyChecker 处理代理检测的主要结构体
 type ProxyChecker struct {
@@ -64,7 +59,7 @@ var Progress atomic.Uint32
 var Available atomic.Uint32
 var ProxyCount atomic.Uint32
 var TotalBytes atomic.Uint64
-var Phase atomic.Uint32 // 0=idle, 1=alive, 2=speed, 3=media
+var Phase atomic.Uint32 // 0=idle, 1=alive, 2=media, 3=speed
 
 // PhaseResult 保存单个阶段的最终结果
 type PhaseResult struct {
@@ -152,7 +147,7 @@ func Check() ([]Result, error) {
 	return checker.run(proxies)
 }
 
-// run 运行三阶段检测流程
+// run 运行三阶段检测流程:测活 → 流媒体+重命名 → filter → 测速
 func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	if config.GlobalConfig.TotalSpeedLimit != 0 {
 		Bucket = ratelimit.NewBucketWithRate(float64(config.GlobalConfig.TotalSpeedLimit*1024*1024), int64(config.GlobalConfig.TotalSpeedLimit*1024*1024/10))
@@ -184,37 +179,39 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	SavePhaseResult(1, Available.Load(), ProxyCount.Load())
 	slog.Info(fmt.Sprintf("存活节点数量: %d", len(aliveResults)))
 
-	// === Phase 2: 测速 (可选) ===
-	var speedResults []speedResult
-	if hasSpeedTest && len(aliveResults) > 0 {
+	// === Phase 2: 流媒体检测 + 国家查询 ===
+	var mediaResults []Result
+	if len(aliveResults) > 0 {
 		Phase.Store(2)
 		pc.resetPhaseCounters(len(aliveResults))
 
-		speedConcurrency := effectiveConcurrency(config.GlobalConfig.SpeedConcurrent, config.GlobalConfig.Concurrent, len(aliveResults))
-		slog.Info(fmt.Sprintf("阶段2-测速: 节点数=%d, 并发数=%d", len(aliveResults), speedConcurrency))
+		mediaConcurrency := effectiveConcurrency(config.GlobalConfig.MediaConcurrent, config.GlobalConfig.Concurrent, len(aliveResults))
+		slog.Info(fmt.Sprintf("阶段2-流媒体+重命名: 节点数=%d, 并发数=%d", len(aliveResults), mediaConcurrency))
 		resumeProgress()
-		speedResults = pc.runSpeedPhase(aliveResults, speedConcurrency)
+		mediaResults = pc.runMediaPhase(aliveResults, mediaConcurrency)
 		pauseProgress()
 		SavePhaseResult(2, Available.Load(), ProxyCount.Load())
-		slog.Info(fmt.Sprintf("测速通过节点数量: %d", len(speedResults)))
-	} else {
-		// 无测速：直接转换
-		for _, a := range aliveResults {
-			speedResults = append(speedResults, speedResult{Proxy: a.Proxy, Speed: 0})
-		}
+		slog.Info(fmt.Sprintf("流媒体阶段节点数量: %d", len(mediaResults)))
 	}
 
-	// === Phase 3: 流媒体检测 + 重命名（不淘汰节点，ForceClose 也需执行以保留已有结果） ===
-	if len(speedResults) > 0 {
-		Phase.Store(3)
-		pc.resetPhaseCounters(len(speedResults))
+	// === Filter: 在测速之前过滤 ===
+	filteredResults := FilterResults(mediaResults)
 
-		mediaConcurrency := effectiveConcurrency(config.GlobalConfig.MediaConcurrent, config.GlobalConfig.Concurrent, len(speedResults))
-		slog.Info(fmt.Sprintf("阶段3-流媒体+重命名: 节点数=%d, 并发数=%d", len(speedResults), mediaConcurrency))
+	// === Phase 3: 测速 (可选) ===
+	if hasSpeedTest && len(filteredResults) > 0 {
+		Phase.Store(3)
+		pc.resetPhaseCounters(len(filteredResults))
+
+		speedConcurrency := effectiveConcurrency(config.GlobalConfig.SpeedConcurrent, config.GlobalConfig.Concurrent, len(filteredResults))
+		slog.Info(fmt.Sprintf("阶段3-测速: 节点数=%d, 并发数=%d", len(filteredResults), speedConcurrency))
 		resumeProgress()
-		pc.results = pc.runMediaPhase(speedResults, mediaConcurrency)
+		pc.results = pc.runSpeedPhase(filteredResults, speedConcurrency)
 		pauseProgress()
 		SavePhaseResult(3, Available.Load(), ProxyCount.Load())
+		slog.Info(fmt.Sprintf("测速通过节点数量: %d", len(pc.results)))
+	} else {
+		// 无测速：过滤后直接作为最终结果
+		pc.results = filteredResults
 	}
 
 	if config.GlobalConfig.PrintProgress {
@@ -232,10 +229,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	// 检查订阅成功率并发出警告
 	pc.checkSubscriptionSuccessRate(proxies)
 
-	// 应用节点名称过滤规则
-	filteredResults := FilterResults(pc.results)
-
-	return filteredResults, nil
+	return pc.results, nil
 }
 
 // runAlivePhase 执行测活阶段
@@ -281,25 +275,25 @@ func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int,
 	return results
 }
 
-// runSpeedPhase 执行测速阶段
-// ForceClose 时未测速的节点以 Speed=0 直接加入结果，不丢弃
-// SuccessLimit 时未测速的节点直接丢弃
-func (pc *ProxyChecker) runSpeedPhase(alive []aliveResult, concurrency int) []speedResult {
-	var results []speedResult
+// runSpeedPhase 执行测速阶段。
+// 入参是已经通过 filter 的 Result 集合。
+// 通过 min-speed 的节点填充 Result.Speed;未通过的节点被丢弃。
+// ForceClose 或 SuccessLimit 时未测速的节点都直接丢弃,
+// 避免和已测速节点混在一起造成"有的有速度标签有的没有"的乱象。
+func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
+	var results []Result
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	tasks := make(chan aliveResult, 1)
-	var distributed int32
-	var stoppedByForceClose atomic.Bool
+	tasks := make(chan Result, 1)
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for a := range tasks {
-				if r := pc.checkSpeed(a); r != nil {
+			for r := range tasks {
+				if updated := pc.checkSpeed(r); updated != nil {
 					mu.Lock()
-					results = append(results, *r)
+					results = append(results, *updated)
 					mu.Unlock()
 					pc.incrementAvailable()
 				}
@@ -309,82 +303,60 @@ func (pc *ProxyChecker) runSpeedPhase(alive []aliveResult, concurrency int) []sp
 	}
 
 	go func() {
-		for i, a := range alive {
+		for _, r := range in {
 			if config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
 				slog.Warn(fmt.Sprintf("达到测速成功数量限制: %d，停止派发", config.GlobalConfig.SuccessLimit))
-				atomic.StoreInt32(&distributed, int32(i))
 				break
 			}
 			if ForceClose.Load() {
-				slog.Warn("收到强制关闭信号，停止派发测速任务，未测速节点将直接保留")
-				stoppedByForceClose.Store(true)
-				atomic.StoreInt32(&distributed, int32(i))
+				slog.Warn("收到强制关闭信号，停止派发测速任务，未测速节点将丢弃")
 				break
 			}
-			tasks <- a
-			atomic.StoreInt32(&distributed, int32(i+1))
+			tasks <- r
 		}
 		close(tasks)
 	}()
 
 	wg.Wait()
-
-	// 仅 ForceClose 时保留未测速节点，SuccessLimit 时不保留
-	if stoppedByForceClose.Load() {
-		skipped := alive[atomic.LoadInt32(&distributed):]
-		for _, a := range skipped {
-			results = append(results, speedResult{Proxy: a.Proxy, Speed: 0})
-		}
-	}
-
 	return results
 }
 
-// runMediaPhase 执行流媒体检测+重命名阶段
-// ForceClose 时未检测的节点直接保留，不丢弃
-func (pc *ProxyChecker) runMediaPhase(speed []speedResult, concurrency int) []Result {
+// runMediaPhase 执行流媒体检测 + 国家查询阶段。
+// 不会修改 proxy["name"];检测结果写入 Result 的结构化字段。
+// ForceClose 时未派发的节点直接丢弃,只输出已完成检测的节点,
+// 避免和已检测节点混在一起造成"有的有标签有的没有"的乱象。
+func (pc *ProxyChecker) runMediaPhase(alive []aliveResult, concurrency int) []Result {
 	var results []Result
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	tasks := make(chan speedResult, 1)
-	var distributed int32
+	tasks := make(chan aliveResult, 1)
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for sr := range tasks {
-				if r := pc.checkMedia(sr); r != nil {
-					mu.Lock()
-					results = append(results, *r)
-					mu.Unlock()
-				}
+			for a := range tasks {
+				r := pc.checkMedia(a)
+				mu.Lock()
+				results = append(results, *r)
+				mu.Unlock()
 				pc.incrementProgress()
 			}
 		}()
 	}
 
 	go func() {
-		for i, sr := range speed {
+		for _, a := range alive {
 			if ForceClose.Load() {
-				slog.Warn("收到强制关闭信号，停止派发流媒体任务，未检测节点将直接保留")
-				atomic.StoreInt32(&distributed, int32(i))
+				slog.Warn("收到强制关闭信号，停止派发流媒体任务，未检测节点将丢弃")
 				break
 			}
-			tasks <- sr
-			atomic.StoreInt32(&distributed, int32(i+1))
+			tasks <- a
 		}
 		close(tasks)
 	}()
 
 	wg.Wait()
-
-	// 将未派发的节点直接加入结果（无流媒体标签和重命名）
-	skipped := speed[atomic.LoadInt32(&distributed):]
-	for _, sr := range skipped {
-		results = append(results, Result{Proxy: sr.Proxy})
-	}
-
 	return results
 }
 
@@ -409,15 +381,18 @@ func (pc *ProxyChecker) checkAlive(proxy map[string]any) *aliveResult {
 	return &aliveResult{Proxy: proxy}
 }
 
-// checkSpeed 对存活代理执行测速
-func (pc *ProxyChecker) checkSpeed(a aliveResult) *speedResult {
+// checkSpeed 对已有的 Result 执行测速。
+// 通过 min-speed 的节点填充 r.Speed 并返回;未通过的返回 nil。
+// 不修改 proxy["name"]。
+func (pc *ProxyChecker) checkSpeed(r Result) *Result {
 	if os.Getenv("SUB_CHECK_SKIP") != "" {
-		return &speedResult{Proxy: a.Proxy, Speed: 0}
+		r.Speed = 0
+		return &r
 	}
 
-	httpClient := CreateClient(a.Proxy)
+	httpClient := CreateClient(r.Proxy)
 	if httpClient == nil {
-		slog.Debug(fmt.Sprintf("创建代理Client失败: %v", a.Proxy["name"]))
+		slog.Debug(fmt.Sprintf("创建代理Client失败: %v", r.Proxy["name"]))
 		return nil
 	}
 	defer httpClient.Close()
@@ -427,25 +402,23 @@ func (pc *ProxyChecker) checkSpeed(a aliveResult) *speedResult {
 		return nil
 	}
 
-	return &speedResult{Proxy: a.Proxy, Speed: speed}
+	r.Speed = speed
+	return &r
 }
 
-// checkMedia 执行流媒体检测和重命名
-// 此阶段不会丢弃节点，即使创建Client失败或流媒体检测失败，节点仍会保留
-func (pc *ProxyChecker) checkMedia(sr speedResult) *Result {
-	res := &Result{
-		Proxy: sr.Proxy,
-	}
+// checkMedia 执行流媒体检测和必要的国家查询。
+// 不会丢弃节点,不会修改 proxy["name"];检测结果写入 Result 的结构化字段。
+func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
+	res := &Result{Proxy: a.Proxy}
 
 	if os.Getenv("SUB_CHECK_SKIP") != "" {
 		pc.incrementAvailable()
 		return res
 	}
 
-	httpClient := CreateClient(sr.Proxy)
+	httpClient := CreateClient(a.Proxy)
 	if httpClient == nil {
-		slog.Debug(fmt.Sprintf("创建代理Client失败，跳过流媒体检测: %v", sr.Proxy["name"]))
-		// 仍然保留节点，仅跳过流媒体检测和重命名
+		slog.Debug(fmt.Sprintf("创建代理Client失败，跳过流媒体检测: %v", a.Proxy["name"]))
 		pc.incrementAvailable()
 		return res
 	}
@@ -548,118 +521,14 @@ func (pc *ProxyChecker) checkMedia(sr speedResult) *Result {
 		mediaWg.Wait()
 	}
 
-	// 更新代理名称
-	pc.updateProxyName(res, httpClient, sr.Speed)
+	// 如果没有通过 iprisk 得到 Country，而 RenameNode 开启，则显式查一次国家
+	if res.Country == "" && config.GlobalConfig.RenameNode {
+		country, _ := proxyutils.GetProxyCountry(httpClient.Client)
+		res.Country = country
+	}
+
 	pc.incrementAvailable()
 	return res
-}
-
-// updateProxyName 更新代理名称
-func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, speed int) {
-	// 以节点IP查询位置重命名节点
-	if config.GlobalConfig.RenameNode {
-		if res.Country != "" {
-			res.Proxy["name"] = config.GlobalConfig.NodePrefix + proxyutils.Rename(res.Country)
-		} else {
-			country, _ := proxyutils.GetProxyCountry(httpClient.Client)
-			res.Proxy["name"] = config.GlobalConfig.NodePrefix + proxyutils.Rename(country)
-		}
-	}
-
-	name := res.Proxy["name"].(string)
-	name = strings.TrimSpace(name)
-
-	var tags []string
-	// 获取速度
-	if config.GlobalConfig.SpeedTestUrl != "" {
-		name = regexp.MustCompile(`\s*\|(?:\s*[\d.]+[KM]B/s)`).ReplaceAllString(name, "")
-		var speedStr string
-		if speed < 1024 {
-			speedStr = fmt.Sprintf("%dKB/s", speed)
-		} else {
-			speedStr = fmt.Sprintf("%.1fMB/s", float64(speed)/1024)
-		}
-		tags = append(tags, speedStr)
-	}
-
-	if config.GlobalConfig.MediaCheck {
-		// 移除已有的标记（IPRisk和平台标记）
-		name = regexp.MustCompile(`\s*\|(?:NF(?:-[A-Z]{2})?|D\+|GPT⁺(?:-[A-Z]{2})?|GPT(?:-[A-Z]{2})?|GM(?:-[A-Z]{2})?|CL(?:-[A-Z]{2})?|SP(?:-[A-Z]{2})?|YT-[^|]+|TK-[^|]+|\d+%)`).ReplaceAllString(name, "")
-	}
-
-	// 按用户输入顺序定义
-	for _, plat := range config.GlobalConfig.Platforms {
-		switch plat {
-		case "openai":
-			if res.Openai != nil {
-				if res.Openai.Full {
-					if res.Openai.Region != "" {
-						tags = append(tags, fmt.Sprintf("GPT⁺-%s", res.Openai.Region))
-					} else {
-						tags = append(tags, "GPT⁺")
-					}
-				} else if res.Openai.Web {
-					if res.Openai.Region != "" {
-						tags = append(tags, fmt.Sprintf("GPT-%s", res.Openai.Region))
-					} else {
-						tags = append(tags, "GPT")
-					}
-				}
-			}
-		case "netflix":
-			if res.Netflix != nil {
-				if res.Netflix.Full {
-					if res.Netflix.Region != "" {
-						tags = append(tags, fmt.Sprintf("NF-%s", res.Netflix.Region))
-					} else {
-						tags = append(tags, "NF")
-					}
-				} else if res.Netflix.OriginalsOnly {
-					tags = append(tags, "NF")
-				}
-			}
-		case "disney":
-			if res.Disney {
-				tags = append(tags, "D+")
-			}
-		case "gemini":
-			if res.Gemini != "" {
-				tags = append(tags, fmt.Sprintf("GM-%s", res.Gemini))
-			}
-		case "claude":
-			if res.Claude != "" {
-				tags = append(tags, fmt.Sprintf("CL-%s", res.Claude))
-			}
-		case "spotify":
-			if res.Spotify != "" {
-				tags = append(tags, fmt.Sprintf("SP-%s", res.Spotify))
-			}
-		case "iprisk":
-			if res.IPRisk != "" {
-				tags = append(tags, res.IPRisk)
-			}
-		case "youtube":
-			if res.Youtube != "" {
-				tags = append(tags, fmt.Sprintf("YT-%s", res.Youtube))
-			}
-		case "tiktok":
-			if res.TikTok != "" {
-				tags = append(tags, fmt.Sprintf("TK-%s", res.TikTok))
-			}
-		}
-	}
-
-	if tag, ok := res.Proxy["sub_tag"].(string); ok && tag != "" {
-		tags = append(tags, tag)
-	}
-
-	// 将所有标记添加到名称中
-	if len(tags) > 0 {
-		name += "|" + strings.Join(tags, "|")
-	}
-
-	res.Proxy["name"] = name
-
 }
 
 // showProgress 显示进度条
@@ -670,13 +539,17 @@ func (pc *ProxyChecker) showProgress(done chan bool) {
 	}
 	phases := map[uint32]phaseInfo{
 		1: {"测活", "存活"},
-		2: {"测速", "通过"},
-		3: {"流媒体+重命名", "完成"},
+		2: {"流媒体+重命名", "完成"},
+		3: {"测速", "通过"},
 	}
 	for {
 		select {
 		case <-done:
-			fmt.Println()
+			// pauseProgress 已经在阶段结束时把 \r 行收尾换行了,
+			// 这里只在还有未收尾的进度行时才补换行,避免在已经干净的输出后多插一个空行
+			if progressRendered.Load() {
+				fmt.Println()
+			}
 			return
 		default:
 			if progressPaused.Load() {
@@ -718,7 +591,8 @@ func pauseProgress() {
 	progressPaused.Store(true)
 	time.Sleep(150 * time.Millisecond) // 等待进度条goroutine停止输出
 	if progressRendered.Load() {
-		fmt.Println() // 仅在进度条实际输出过时才换行
+		fmt.Println()                  // 仅在进度条实际输出过时才换行
+		progressRendered.Store(false) // 标记换行已收尾,避免后续 done 信号重复换行
 	}
 }
 
