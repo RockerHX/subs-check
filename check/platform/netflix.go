@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var netflixRe = regexp.MustCompile(`/([a-z]{2})/title/`)
+
 // NetflixResult 表示 Netflix 检测结果
 type NetflixResult struct {
 	Full          bool   // 全解锁
@@ -80,8 +82,7 @@ func getNetflixRegion(httpClient *http.Client) string {
 	}
 
 	// Location 格式如: https://www.netflix.com/xx/title/80018499
-	re := regexp.MustCompile(`/([a-z]{2})/title/`)
-	matches := re.FindStringSubmatch(location)
+	matches := netflixRe.FindStringSubmatch(location)
 	if len(matches) > 1 {
 		return strings.ToUpper(matches[1])
 	}

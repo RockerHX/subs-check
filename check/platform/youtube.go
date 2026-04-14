@@ -8,7 +8,7 @@ import (
 )
 
 // 在body中查找 INNERTUBE_CONTEXT_GL 并提取区域代码
-var re = regexp.MustCompile(`"INNERTUBE_CONTEXT_GL"\s*:\s*"([^"]+)"`)
+var youtubeRe = regexp.MustCompile(`"INNERTUBE_CONTEXT_GL"\s*:\s*"([^"]+)"`)
 
 func CheckYoutube(httpClient *http.Client) (string, error) {
 	// 创建请求
@@ -50,7 +50,7 @@ func CheckYoutube(httpClient *http.Client) (string, error) {
 	}
 
 	// 先检测上方是否送中，在检测位置
-	match := re.FindSubmatch(body)
+	match := youtubeRe.FindSubmatch(body)
 	if len(match) > 1 {
 		if region := string(match[1]); region != "" {
 			return region, nil

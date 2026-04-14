@@ -6,6 +6,8 @@ import (
 	"regexp"
 )
 
+var claudeRe = regexp.MustCompile(`loc=([A-Z]{2})`)
+
 // Claude 封禁地区列表（二字码）
 var claudeBlockedRegions = map[string]bool{
 	"AF": true, "BY": true, "CN": true, "CU": true, "HK": true,
@@ -33,8 +35,7 @@ func CheckClaude(httpClient *http.Client) (string, error) {
 		return "", err
 	}
 
-	re := regexp.MustCompile(`loc=([A-Z]{2})`)
-	matches := re.FindSubmatch(body)
+	matches := claudeRe.FindSubmatch(body)
 	if len(matches) <= 1 {
 		return "", nil
 	}

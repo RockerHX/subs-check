@@ -9,6 +9,8 @@ import (
 	"github.com/biter777/countries"
 )
 
+var geminiRe = regexp.MustCompile(`,2,1,200,"([A-Z]{3})"`)
+
 // Gemini 封禁地区列表（三字码）
 var geminiBlockedCodes = map[string]bool{
 	"CHN": true, "RUS": true, "BLR": true, "CUB": true,
@@ -45,8 +47,7 @@ func CheckGemini(httpClient *http.Client) (string, error) {
 	}
 
 	// 提取三字母国家码
-	re := regexp.MustCompile(`,2,1,200,"([A-Z]{3})"`)
-	matches := re.FindSubmatch(body)
+	matches := geminiRe.FindSubmatch(body)
 	if len(matches) <= 1 {
 		return "", nil
 	}

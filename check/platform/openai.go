@@ -7,6 +7,8 @@ import (
 	"regexp"
 )
 
+var openaiRe = regexp.MustCompile(`loc=([A-Z]{2})`)
+
 // OpenAIResult 表示 OpenAI 检测结果
 type OpenAIResult struct {
 	Full   bool   // 客户端可用（cookies+client双通过）
@@ -55,8 +57,7 @@ func getOpenAIRegion(httpClient *http.Client) string {
 		return ""
 	}
 
-	re := regexp.MustCompile(`loc=([A-Z]{2})`)
-	matches := re.FindSubmatch(body)
+	matches := openaiRe.FindSubmatch(body)
 	if len(matches) > 1 {
 		return string(matches[1])
 	}

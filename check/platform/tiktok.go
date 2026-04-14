@@ -6,6 +6,8 @@ import (
 	"regexp"
 )
 
+var tiktokRe = regexp.MustCompile(`"region"\s*:\s*"([A-Z]{2})"`)
+
 func CheckTikTok(httpClient *http.Client) (string, error) {
 	req, err := http.NewRequest("GET", "https://www.tiktok.com/", nil)
 	if err != nil {
@@ -28,8 +30,7 @@ func CheckTikTok(httpClient *http.Client) (string, error) {
 	}
 
 	// 使用正则匹配 "region":"XX"
-	re := regexp.MustCompile(`"region"\s*:\s*"([A-Z]{2})"`)
-	matches := re.FindSubmatch(body)
+	matches := tiktokRe.FindSubmatch(body)
 	if len(matches) >= 2 {
 		return string(matches[1]), nil
 	}
