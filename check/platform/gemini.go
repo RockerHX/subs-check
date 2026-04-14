@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -41,10 +40,12 @@ func CheckGemini(httpClient *http.Client) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return "", err
 	}
+	body := buf.Bytes()
 
 	// 提取三字母国家码
 	matches := geminiRe.FindSubmatch(body)

@@ -2,7 +2,6 @@ package platform
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 	"regexp"
 )
@@ -52,10 +51,12 @@ func getOpenAIRegion(httpClient *http.Client) string {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return ""
 	}
+	body := buf.Bytes()
 
 	matches := openaiRe.FindSubmatch(body)
 	if len(matches) > 1 {
@@ -77,10 +78,12 @@ func checkCookies(httpClient *http.Client) bool {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return false
 	}
+	body := buf.Bytes()
 
 	return !bytes.Contains(bytes.ToLower(body), []byte("unsupported_country"))
 }
@@ -108,10 +111,12 @@ func checkClient(httpClient *http.Client) bool {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return false
 	}
+	body := buf.Bytes()
 
 	bodyLower := bytes.ToLower(body)
 	return !bytes.Contains(bodyLower, []byte("unsupported_country")) && !bytes.Contains(bodyLower, []byte("vpn"))

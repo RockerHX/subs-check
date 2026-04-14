@@ -3,7 +3,6 @@ package platform
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/metacubex/mihomo/common/convert"
@@ -23,10 +22,12 @@ func CheckIPRisk(httpClient *http.Client, ip string) (string, error) {
 
 	if resp.StatusCode == 200 {
 		// 读取响应内容
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
+		buf := getPooledBuf()
+		defer putPooledBuf(buf)
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
 			return "", err
 		}
+		body := buf.Bytes()
 		marker := []byte("IP Fraud Risk API")
 		apiIndex := bytes.Index(body, marker)
 		if apiIndex == -1 {

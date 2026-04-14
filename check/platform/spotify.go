@@ -2,7 +2,6 @@ package platform
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 	"strings"
 )
@@ -38,10 +37,12 @@ func CheckSpotify(httpClient *http.Client) (string, error) {
 	}
 
 	// 方式2: 从 body 中提取 countryCode
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return "", err
 	}
+	body := buf.Bytes()
 
 	// 检查是否被封禁
 	if bytes.Contains(bytes.ToLower(body), []byte("not available in your country")) {

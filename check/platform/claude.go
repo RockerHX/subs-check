@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"io"
 	"net/http"
 	"regexp"
 )
@@ -30,10 +29,12 @@ func CheckClaude(httpClient *http.Client) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return "", err
 	}
+	body := buf.Bytes()
 
 	matches := claudeRe.FindSubmatch(body)
 	if len(matches) <= 1 {

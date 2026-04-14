@@ -2,7 +2,6 @@ package platform
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 	"regexp"
 )
@@ -35,10 +34,12 @@ func CheckYoutube(httpClient *http.Client) (string, error) {
 	defer resp.Body.Close()
 
 	// 读取响应内容
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return "", err
 	}
+	body := buf.Bytes()
 
 	// 送中
 	if bytes.Contains(body, []byte("www.google.cn")) {

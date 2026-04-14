@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"io"
 	"net/http"
 	"regexp"
 )
@@ -24,10 +23,12 @@ func CheckTikTok(httpClient *http.Client) (string, error) {
 		return "", nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	buf := getPooledBuf()
+	defer putPooledBuf(buf)
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return "", err
 	}
+	body := buf.Bytes()
 
 	// 使用正则匹配 "region":"XX"
 	matches := tiktokRe.FindSubmatch(body)
