@@ -44,16 +44,14 @@ func CheckGemini(httpClient *http.Client) (string, error) {
 		return "", err
 	}
 
-	bodyStr := string(body)
-
 	// 提取三字母国家码
 	re := regexp.MustCompile(`,2,1,200,"([A-Z]{3})"`)
-	matches := re.FindStringSubmatch(bodyStr)
+	matches := re.FindSubmatch(body)
 	if len(matches) <= 1 {
 		return "", nil
 	}
 
-	alpha3Code := matches[1]
+	alpha3Code := string(matches[1])
 
 	// 检查是否在封禁列表中
 	if geminiBlockedCodes[alpha3Code] {

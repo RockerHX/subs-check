@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -42,20 +43,18 @@ func CheckSpotify(httpClient *http.Client) (string, error) {
 		return "", err
 	}
 
-	bodyStr := string(body)
-
 	// 检查是否被封禁
-	if strings.Contains(strings.ToLower(bodyStr), "not available in your country") {
+	if bytes.Contains(bytes.ToLower(body), []byte("not available in your country")) {
 		return "", nil
 	}
 
 	// 查找 "countryCode":"XX"
-	marker := `"countryCode":"`
-	if idx := strings.Index(bodyStr, marker); idx != -1 {
+	marker := []byte(`"countryCode":"`)
+	if idx := bytes.Index(body, marker); idx != -1 {
 		start := idx + len(marker)
-		rest := bodyStr[start:]
-		if end := strings.Index(rest, `"`); end > 0 {
-			code := strings.ToUpper(rest[:end])
+		rest := body[start:]
+		if end := bytes.Index(rest, []byte(`"`)); end > 0 {
+			code := strings.ToUpper(string(rest[:end]))
 			if len(code) == 2 {
 				return code, nil
 			}

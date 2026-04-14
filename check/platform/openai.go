@@ -1,10 +1,10 @@
 package platform
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 )
 
 // OpenAIResult 表示 OpenAI 检测结果
@@ -81,7 +81,7 @@ func checkCookies(httpClient *http.Client) bool {
 		return false
 	}
 
-	return !strings.Contains(strings.ToLower(string(body)), "unsupported_country")
+	return !bytes.Contains(bytes.ToLower(body), []byte("unsupported_country"))
 }
 
 // checkClient 通过模拟客户端访问检查app可用性
@@ -112,6 +112,6 @@ func checkClient(httpClient *http.Client) bool {
 		return false
 	}
 
-	bodyLower := strings.ToLower(string(body))
-	return !strings.Contains(bodyLower, "unsupported_country") && !strings.Contains(bodyLower, "vpn")
+	bodyLower := bytes.ToLower(body)
+	return !bytes.Contains(bodyLower, []byte("unsupported_country")) && !bytes.Contains(bodyLower, []byte("vpn"))
 }
