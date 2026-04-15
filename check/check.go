@@ -46,7 +46,6 @@ type aliveResult struct {
 	Proxy map[string]any
 }
 
-
 // ProxyChecker 处理代理检测的主要结构体
 type ProxyChecker struct {
 	results    []Result
@@ -368,7 +367,6 @@ func (pc *ProxyChecker) checkAlive(proxy map[string]any) *aliveResult {
 
 	httpClient := CreateClient(proxy)
 	if httpClient == nil {
-		slog.Debug(fmt.Sprintf("创建代理Client失败: %v", proxy["name"]))
 		return nil
 	}
 	defer httpClient.Close()
@@ -392,7 +390,6 @@ func (pc *ProxyChecker) checkSpeed(r Result) *Result {
 
 	httpClient := CreateClient(r.Proxy)
 	if httpClient == nil {
-		slog.Debug(fmt.Sprintf("创建代理Client失败: %v", r.Proxy["name"]))
 		return nil
 	}
 	defer httpClient.Close()
@@ -418,7 +415,6 @@ func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
 
 	httpClient := CreateClient(a.Proxy)
 	if httpClient == nil {
-		slog.Debug(fmt.Sprintf("创建代理Client失败，跳过流媒体检测: %v", a.Proxy["name"]))
 		pc.incrementAvailable()
 		return res
 	}
@@ -591,7 +587,7 @@ func pauseProgress() {
 	progressPaused.Store(true)
 	time.Sleep(150 * time.Millisecond) // 等待进度条goroutine停止输出
 	if progressRendered.Load() {
-		fmt.Println()                  // 仅在进度条实际输出过时才换行
+		fmt.Println()                 // 仅在进度条实际输出过时才换行
 		progressRendered.Store(false) // 标记换行已收尾,避免后续 done 信号重复换行
 	}
 }
@@ -708,7 +704,7 @@ type ProxyClient struct {
 func CreateClient(mapping map[string]any) *ProxyClient {
 	proxy, err := adapter.ParseProxy(mapping)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("底层mihomo创建代理Client失败: %v", err))
+		slog.Debug("创建mihomo Client失败", "proxy", mapping["name"], "err", err)
 		return nil
 	}
 
