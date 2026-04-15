@@ -37,25 +37,18 @@ func GetProxies() ([]map[string]any, error) {
 	}
 
 	var wg sync.WaitGroup
-	proxyChan := make(chan map[string]any, 1)                              // 缓冲通道存储解析的代理
 	concurrentLimit := make(chan struct{}, config.GlobalConfig.Concurrent) // 限制并发数
 
-	// 启动收集结果的协程
-	var mihomoProxies []map[string]any
-	done := make(chan struct{})
-	go func() {
-		for proxy := range proxyChan {
-			mihomoProxies = append(mihomoProxies, proxy)
-		}
-		done <- struct{}{}
-	}()
+	// 按订阅顺序预分配槽位,每个 goroutine 只写自己的下标,无竞争
+	// 这样即便是并发获取,最终合并时仍能保持 subUrls 的顺序(本地在前,远程在后)
+	buckets := make([][]map[string]any, len(subUrls))
 
 	// 启动工作协程
-	for _, subUrl := range subUrls {
+	for idx, subUrl := range subUrls {
 		wg.Add(1)
 		concurrentLimit <- struct{}{} // 获取令牌
 
-		go func(e subEntry) {
+		go func(i int, e subEntry) {
 			defer wg.Done()
 			defer func() { <-concurrentLimit }() // 释放令牌
 
@@ -71,6 +64,8 @@ func GetProxies() ([]map[string]any, error) {
 				tag = d.Fragment
 			}
 
+			var local []map[string]any
+
 			var con map[string]any
 			err = yaml.Unmarshal(data, &con)
 			if err != nil {
@@ -80,6 +75,7 @@ func GetProxies() ([]map[string]any, error) {
 					return
 				}
 				slog.Debug("获取订阅链接", "source", e.source, "url", url, "count", len(proxyList))
+				local = make([]map[string]any, 0, len(proxyList))
 				for _, proxy := range proxyList {
 					// 只测试指定协议
 					if t, ok := proxy["type"].(string); ok {
@@ -93,8 +89,9 @@ func GetProxies() ([]map[string]any, error) {
 					if tag != "" {
 						proxy["sub_tag"] = tag
 					}
-					proxyChan <- proxy
+					local = append(local, proxy)
 				}
+				buckets[i] = local
 				return
 			}
 
@@ -109,6 +106,7 @@ func GetProxies() ([]map[string]any, error) {
 				return
 			}
 			slog.Debug("获取订阅链接", "source", e.source, "url", url, "count", len(proxyList))
+			local = make([]map[string]any, 0, len(proxyList))
 			for _, proxy := range proxyList {
 				if proxyMap, ok := proxy.(map[string]any); ok {
 					if t, ok := proxyMap["type"].(string); ok {
@@ -131,16 +129,25 @@ func GetProxies() ([]map[string]any, error) {
 					if tag != "" {
 						proxyMap["sub_tag"] = tag
 					}
-					proxyChan <- proxyMap
+					local = append(local, proxyMap)
 				}
 			}
-		}(subEntry{url: utils.WarpUrl(subUrl.url), source: subUrl.source})
+			buckets[i] = local
+		}(idx, subEntry{url: utils.WarpUrl(subUrl.url), source: subUrl.source})
 	}
 
 	// 等待所有工作协程完成
 	wg.Wait()
-	close(proxyChan)
-	<-done // 等待收集完成
+
+	// 按订阅顺序合并,保证本地订阅在前、远程订阅在后,订阅内节点顺序也保留
+	total := 0
+	for _, b := range buckets {
+		total += len(b)
+	}
+	mihomoProxies := make([]map[string]any, 0, total)
+	for _, b := range buckets {
+		mihomoProxies = append(mihomoProxies, b...)
+	}
 
 	return mihomoProxies, nil
 }
