@@ -233,21 +233,24 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 
 // runAlivePhase 执行测活阶段
 // applySuccessLimit: 当没有测速阶段时，SuccessLimit 在此阶段生效
+// 采用分槽法保序:worker 写入预分配的固定下标,最终按 proxies 输入顺序 flatten,
+// 保证输出与 GetProxies 的订阅顺序一致(本地订阅在前)。
 func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int, applySuccessLimit bool) []aliveResult {
-	var results []aliveResult
-	var mu sync.Mutex
+	type aliveTask struct {
+		idx   int
+		proxy map[string]any
+	}
+	out := make([]*aliveResult, len(proxies))
 	var wg sync.WaitGroup
-	tasks := make(chan map[string]any, 1)
+	tasks := make(chan aliveTask, 1)
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for proxy := range tasks {
-				if r := pc.checkAlive(proxy); r != nil {
-					mu.Lock()
-					results = append(results, *r)
-					mu.Unlock()
+			for t := range tasks {
+				if r := pc.checkAlive(t.proxy); r != nil {
+					out[t.idx] = r
 					pc.incrementAvailable()
 				}
 				pc.incrementProgress()
@@ -256,7 +259,7 @@ func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int,
 	}
 
 	go func() {
-		for _, proxy := range proxies {
+		for i, proxy := range proxies {
 			if applySuccessLimit && config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
 				slog.Warn(fmt.Sprintf("达到存活成功数量限制: %d，停止派发", config.GlobalConfig.SuccessLimit))
 				break
@@ -265,12 +268,19 @@ func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int,
 				slog.Warn("收到强制关闭信号，停止派发任务")
 				break
 			}
-			tasks <- proxy
+			tasks <- aliveTask{idx: i, proxy: proxy}
 		}
 		close(tasks)
 	}()
 
 	wg.Wait()
+
+	results := make([]aliveResult, 0, len(out))
+	for _, r := range out {
+		if r != nil {
+			results = append(results, *r)
+		}
+	}
 	return results
 }
 
@@ -279,21 +289,23 @@ func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int,
 // 通过 min-speed 的节点填充 Result.Speed;未通过的节点被丢弃。
 // ForceClose 或 SuccessLimit 时未测速的节点都直接丢弃,
 // 避免和已测速节点混在一起造成"有的有速度标签有的没有"的乱象。
+// 采用分槽法保序:worker 写入预分配的固定下标,最终按 in 输入顺序 flatten。
 func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
-	var results []Result
-	var mu sync.Mutex
+	type speedTask struct {
+		idx int
+		r   Result
+	}
+	out := make([]*Result, len(in))
 	var wg sync.WaitGroup
-	tasks := make(chan Result, 1)
+	tasks := make(chan speedTask, 1)
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for r := range tasks {
-				if updated := pc.checkSpeed(r); updated != nil {
-					mu.Lock()
-					results = append(results, *updated)
-					mu.Unlock()
+			for t := range tasks {
+				if updated := pc.checkSpeed(t.r); updated != nil {
+					out[t.idx] = updated
 					pc.incrementAvailable()
 				}
 				pc.incrementProgress()
@@ -302,7 +314,7 @@ func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
 	}
 
 	go func() {
-		for _, r := range in {
+		for i, r := range in {
 			if config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
 				slog.Warn(fmt.Sprintf("达到测速成功数量限制: %d，停止派发", config.GlobalConfig.SuccessLimit))
 				break
@@ -311,12 +323,19 @@ func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
 				slog.Warn("收到强制关闭信号，停止派发测速任务，未测速节点将丢弃")
 				break
 			}
-			tasks <- r
+			tasks <- speedTask{idx: i, r: r}
 		}
 		close(tasks)
 	}()
 
 	wg.Wait()
+
+	results := make([]Result, 0, len(out))
+	for _, r := range out {
+		if r != nil {
+			results = append(results, *r)
+		}
+	}
 	return results
 }
 
@@ -324,38 +343,46 @@ func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
 // 不会修改 proxy["name"];检测结果写入 Result 的结构化字段。
 // ForceClose 时未派发的节点直接丢弃,只输出已完成检测的节点,
 // 避免和已检测节点混在一起造成"有的有标签有的没有"的乱象。
+// 采用分槽法保序:worker 写入预分配的固定下标,最终按 alive 输入顺序 flatten。
 func (pc *ProxyChecker) runMediaPhase(alive []aliveResult, concurrency int) []Result {
-	var results []Result
-	var mu sync.Mutex
+	type mediaTask struct {
+		idx int
+		a   aliveResult
+	}
+	out := make([]*Result, len(alive))
 	var wg sync.WaitGroup
-	tasks := make(chan aliveResult, 1)
+	tasks := make(chan mediaTask, 1)
 
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for a := range tasks {
-				r := pc.checkMedia(a)
-				mu.Lock()
-				results = append(results, *r)
-				mu.Unlock()
+			for t := range tasks {
+				out[t.idx] = pc.checkMedia(t.a)
 				pc.incrementProgress()
 			}
 		}()
 	}
 
 	go func() {
-		for _, a := range alive {
+		for i, a := range alive {
 			if ForceClose.Load() {
 				slog.Warn("收到强制关闭信号，停止派发流媒体任务，未检测节点将丢弃")
 				break
 			}
-			tasks <- a
+			tasks <- mediaTask{idx: i, a: a}
 		}
 		close(tasks)
 	}()
 
 	wg.Wait()
+
+	results := make([]Result, 0, len(out))
+	for _, r := range out {
+		if r != nil {
+			results = append(results, *r)
+		}
+	}
 	return results
 }
 
