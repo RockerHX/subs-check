@@ -3,6 +3,7 @@ module github.com/beck-8/subs-check
 go 1.25.0
 
 require (
+	github.com/beck-8/2clash v0.0.0-20260420045119-42270efca3e0
 	github.com/biter777/countries v1.7.5
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-contrib/pprof v1.5.4
