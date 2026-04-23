@@ -250,8 +250,11 @@ sub-urls:
   # - https://example.com/sub2.txt
   # - https://example.com/sub?token=43fa8f0dc9bb00dcfec2afb21b14378a
   # - https://example.com/sub?token=43fa8f0dc9bb00dcfec2afb21b14378a?flag=clash.meta
+    # 所有时间占位符均支持 ±N 天偏移，例如 {Ymd-1} 表示昨天、{Y-m-d+1} 表示明天
   # - https://raw.githubusercontent.com/example/repo/main/config/{Ymd}.yaml
   # - https://raw.githubusercontent.com/example/repo/main/daily/daily-{Y}-{m}-{d}.yaml
+  # - https://raw.githubusercontent.com/example/repo/main/config/{Ymd-1}.yaml
+  # - https://raw.githubusercontent.com/example/repo/main/daily/daily-{Y-m-d+1}.yaml
   # - https://example.com/sub.txt#我是备注我是备注
   # 打开这个就可以把上次可用的节点再次测一次
   # - "http://127.0.0.1:8199/sub/all.yaml"
