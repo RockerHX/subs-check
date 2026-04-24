@@ -19,8 +19,12 @@ import (
 // filter 阶段应该传 false,因为此时尚未测速。
 func RenderName(r Result, includeSpeed bool) string {
 	// 1. base 名字
+	// RenameNode 是"强覆盖合约":只要开了就用 Rename(Country) 的结果覆盖原名,
+	// Country 为空时 Rename 会走 ❓Other_N 的兜底。
+	// 这样能确保上游订阅里已有的 |speed|media 尾缀不会透传进来再被叠加,
+	// 否则在 IP 查询失败(免费节点常见)的节点上会出现重复标签。
 	var base string
-	if config.GlobalConfig.RenameNode && r.Country != "" {
+	if config.GlobalConfig.RenameNode {
 		base = config.GlobalConfig.NodePrefix + proxyutils.Rename(r.Country)
 	} else if r.Proxy != nil {
 		if n, ok := r.Proxy["name"].(string); ok {

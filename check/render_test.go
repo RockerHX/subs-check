@@ -241,21 +241,28 @@ func TestRenderName_RenameOnWithCountry(t *testing.T) {
 	})
 }
 
-func TestRenderName_RenameOnButEmptyCountry_FallsBackToOriginal(t *testing.T) {
-	// 重命名开启但 Country 为空(Phase 2 查询失败),应回退到原名
+func TestRenderName_RenameOnButEmptyCountry_UsesOtherFallback(t *testing.T) {
+	// 重命名开启但 Country 为空(Phase 2 查询失败),应走 ❓Other 兜底
+	// 而不是回退到原名,否则上游带 |speed|media 尾缀的脏名会透传进来再被叠加。
+	proxyutils.ResetRenameCounter()
 	withConfig(t, config.Config{
 		RenameNode: true,
 		NodePrefix: "PREFIX-",
 		Platforms:  []string{},
 	}, func() {
 		r := Result{
-			Proxy:   map[string]any{"name": "original"},
+			Proxy:   map[string]any{"name": "🇹🇼原名|745KB/s|YT-TW"},
 			Country: "",
 		}
 		got := RenderName(r, false)
-		want := "original"
-		if got != want {
-			t.Errorf("RenderName() = %q, want %q", got, want)
+		if got == "🇹🇼原名|745KB/s|YT-TW" {
+			t.Errorf("RenderName() should not preserve polluted original name when RenameNode=true, got %q", got)
+		}
+		if len(got) < len("PREFIX-") || got[:len("PREFIX-")] != "PREFIX-" {
+			t.Errorf("RenderName() should start with prefix, got %q", got)
+		}
+		if !stringContains(got, "Other") {
+			t.Errorf("RenderName() should fall back to Other when Country is empty, got %q", got)
 		}
 	})
 }
