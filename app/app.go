@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"sync/atomic"
@@ -101,7 +100,7 @@ func (app *App) Initialize() error {
 	monitor.StartMemoryMonitor()
 
 	// 设置信号处理器
-	utils.SetupSignalHandler(&check.ForceClose)
+	utils.SetupSignalHandler(check.RequestCancel)
 	return nil
 }
 
@@ -254,8 +253,4 @@ func (app *App) checkProxies() error {
 	utils.ExecuteCallback(len(results))
 
 	return nil
-}
-
-func TempLog() string {
-	return filepath.Join(os.TempDir(), "subs-check.log")
 }

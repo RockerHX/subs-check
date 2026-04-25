@@ -8,8 +8,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,18 +47,32 @@ type aliveResult struct {
 }
 
 // ProxyChecker 处理代理检测的主要结构体
+// Per-stage counts live on package-level atomics (Progress / Available /
+// MediaDone / FilterPassed / SpeedDone / SpeedOk) so both the CLI progress
+// UI and the web admin API can read them without plumbing through a pointer.
 type ProxyChecker struct {
 	results    []Result
 	proxyCount int
-	progress   int32
-	available  int32
+	progress   int32 // alive-stage done count; shared with showProgress
+	available  int32 // alive-stage pass count;  shared with showProgress
 }
 
 var Progress atomic.Uint32
 var Available atomic.Uint32
 var ProxyCount atomic.Uint32
 var TotalBytes atomic.Uint64
-var Phase atomic.Uint32 // 0=idle, 1=alive, 2=media, 3=speed
+var Phase atomic.Uint32 // 0=idle, 1=pipeline running
+
+// Pipeline-wide live counters. These are 0 when idle and reflect
+// how many items have cleared each stage during an active run.
+// AliveDone/AliveOk mirror Progress/Available for backward-compat
+// with the single-phase progress UI.
+var (
+	MediaDone    atomic.Uint32 // checkMedia completions (pass-through, never drops)
+	FilterPassed atomic.Uint32 // items that matched the filter and entered speed/collector
+	SpeedDone    atomic.Uint32 // checkSpeed completions (pass + fail)
+	SpeedOk      atomic.Uint32 // checkSpeed passes (also equals collector input when hasSpeedTest)
+)
 
 // PhaseResult 保存单个阶段的最终结果
 type PhaseResult struct {
@@ -88,9 +102,47 @@ func ResetPhaseResults() {
 	}
 }
 
-var ForceClose atomic.Bool
 var progressPaused atomic.Bool
 var progressRendered atomic.Bool
+
+// activeCancelMu guards activeCancel.
+var activeCancelMu sync.Mutex
+
+// activeCancel cancels the currently running phase. nil when idle or
+// between phases; the per-phase dispatcher installs and clears it.
+var activeCancel context.CancelFunc
+
+// RequestCancel aborts the currently running check phase, if any.
+// Safe to call from any goroutine; no-op when idle.
+// Phases installed after this call are unaffected (per-phase scope,
+// matching the pre-context ForceClose-reset-between-phases behaviour).
+//
+// Deliberately silent: emitting a log here would land between the
+// progress renderer's rows and get overwritten by the next frame's
+// cursor-up escape. run() logs the cancellation after pauseProgress
+// has parked the renderer.
+func RequestCancel() {
+	activeCancelMu.Lock()
+	defer activeCancelMu.Unlock()
+	if activeCancel != nil {
+		activeCancel()
+	}
+}
+
+// installPhaseCancel registers cancel as the active phase canceller
+// and returns a cleanup closure that cancels and clears it.
+// Call the returned closure from a defer in the phase function.
+func installPhaseCancel(cancel context.CancelFunc) func() {
+	activeCancelMu.Lock()
+	activeCancel = cancel
+	activeCancelMu.Unlock()
+	return func() {
+		activeCancelMu.Lock()
+		activeCancel = nil
+		activeCancelMu.Unlock()
+		cancel()
+	}
+}
 
 var Bucket *ratelimit.Bucket
 
@@ -112,7 +164,6 @@ func effectiveConcurrency(phaseConcurrency, fallback, itemCount int) int {
 // Check 执行代理检测的主函数
 func Check() ([]Result, error) {
 	proxyutils.ResetRenameCounter()
-	ForceClose.Store(false)
 
 	ProxyCount.Store(0)
 	Available.Store(0)
@@ -146,7 +197,10 @@ func Check() ([]Result, error) {
 	return checker.run(proxies)
 }
 
-// run 运行三阶段检测流程:测活 → 流媒体+重命名 → filter → 测速
+// run drives the 4-stage pipeline: dispatch → alive → media+filter → speed → collect.
+// Stages run concurrently, connected by channels. SuccessLimit cancels the whole
+// pipeline as soon as the collector has gathered N passing items; in-flight work
+// is drained and un-dispatched items are discarded.
 func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	if config.GlobalConfig.TotalSpeedLimit != 0 {
 		Bucket = ratelimit.NewBucketWithRate(float64(config.GlobalConfig.TotalSpeedLimit*1024*1024), int64(config.GlobalConfig.TotalSpeedLimit*1024*1024/10))
@@ -155,7 +209,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	}
 
 	slog.Info("开始检测节点")
-	slog.Info("当前参数", "timeout", config.GlobalConfig.Timeout, "concurrent", config.GlobalConfig.Concurrent, "speed-concurrent", config.GlobalConfig.SpeedConcurrent, "media-concurrent", config.GlobalConfig.MediaConcurrent, "enable-speedtest", config.GlobalConfig.SpeedTestUrl != "", "min-speed", config.GlobalConfig.MinSpeed, "download-timeout", config.GlobalConfig.DownloadTimeout, "download-mb", config.GlobalConfig.DownloadMB, "total-speed-limit", config.GlobalConfig.TotalSpeedLimit)
+	slog.Info("当前参数", "timeout", config.GlobalConfig.Timeout, "enable-speedtest", config.GlobalConfig.SpeedTestUrl != "", "min-speed", config.GlobalConfig.MinSpeed, "download-timeout", config.GlobalConfig.DownloadTimeout, "download-mb", config.GlobalConfig.DownloadMB, "total-speed-limit", config.GlobalConfig.TotalSpeedLimit)
 
 	ResetPhaseResults()
 
@@ -164,226 +218,291 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 		go pc.showProgress(done)
 	}
 
-	// === Phase 1: 测活 ===
+	// Capture the speed-test URL once at pipeline start so the current run
+	// stays consistent even if the user edits config mid-check. Otherwise
+	// flipping the URL to empty mid-run would cause every in-flight speed
+	// request to fail (no host) and silently drop nearly all results.
+	speedTestURL := config.GlobalConfig.SpeedTestUrl
+	hasSpeedTest := speedTestURL != ""
+	total := len(proxies)
+
+	aliveConcurrency := effectiveConcurrency(config.GlobalConfig.Concurrent, config.GlobalConfig.Concurrent, total)
+	mediaConcurrency := effectiveConcurrency(config.GlobalConfig.MediaConcurrent, config.GlobalConfig.Concurrent, total)
+	speedConcurrency := effectiveConcurrency(config.GlobalConfig.SpeedConcurrent, config.GlobalConfig.Concurrent, total)
+	slog.Info(fmt.Sprintf("启动流水线: 输入=%d, 并发(测活/媒体/测速)=%d/%d/%d", total, aliveConcurrency, mediaConcurrency, speedConcurrency))
+
+	// showProgress keeps reading pc.progress / pc.available / pc.proxyCount;
+	// the alive stage owns these counters throughout the pipeline run.
+	pc.resetPhaseCounters(total)
 	Phase.Store(1)
-	pc.resetPhaseCounters(len(proxies))
-
-	hasSpeedTest := config.GlobalConfig.SpeedTestUrl != ""
-	aliveConcurrency := effectiveConcurrency(config.GlobalConfig.Concurrent, config.GlobalConfig.Concurrent, len(proxies))
-	slog.Info(fmt.Sprintf("阶段1-测活: 节点数=%d, 并发数=%d", len(proxies), aliveConcurrency))
 	resumeProgress()
-	// 没有测速阶段时，SuccessLimit 在测活阶段生效
-	aliveResults := pc.runAlivePhase(proxies, aliveConcurrency, !hasSpeedTest)
-	pauseProgress()
-	SavePhaseResult(1, Available.Load(), ProxyCount.Load())
-	slog.Info(fmt.Sprintf("存活节点数量: %d", len(aliveResults)))
 
-	// === Phase 2: 流媒体检测 + 国家查询 ===
-	var mediaResults []Result
-	if len(aliveResults) > 0 {
-		Phase.Store(2)
-		pc.resetPhaseCounters(len(aliveResults))
-
-		mediaConcurrency := effectiveConcurrency(config.GlobalConfig.MediaConcurrent, config.GlobalConfig.Concurrent, len(aliveResults))
-		slog.Info(fmt.Sprintf("阶段2-流媒体+重命名: 节点数=%d, 并发数=%d", len(aliveResults), mediaConcurrency))
-		resumeProgress()
-		mediaResults = pc.runMediaPhase(aliveResults, mediaConcurrency)
-		pauseProgress()
-		SavePhaseResult(2, Available.Load(), ProxyCount.Load())
-		slog.Info(fmt.Sprintf("流媒体阶段节点数量: %d", len(mediaResults)))
+	// Compile filter patterns once; media workers re-use the slice.
+	patterns := CompileFilterPatterns()
+	if len(patterns) > 0 {
+		slog.Info(fmt.Sprintf("应用节点过滤规则，共 %d 个正则表达式", len(patterns)))
 	}
 
-	// === Filter: 在测速之前过滤 ===
-	filteredResults := FilterResults(mediaResults)
+	// Whole-pipeline cancellation: collector pulls the trigger on SuccessLimit,
+	// RequestCancel pulls it on external SIGHUP / HTTP force-close.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer installPhaseCancel(cancel)()
 
-	// === Phase 3: 测速 (可选) ===
-	if hasSpeedTest && len(filteredResults) > 0 {
-		Phase.Store(3)
-		pc.resetPhaseCounters(len(filteredResults))
+	// Channels sized to each stage's concurrency to keep buffering bounded.
+	aliveIn := make(chan aliveTask, aliveConcurrency)
+	mediaIn := make(chan mediaEntry, mediaConcurrency)
+	speedIn := make(chan pipelineItem, speedConcurrency)
+	collectIn := make(chan pipelineItem, speedConcurrency)
 
-		speedConcurrency := effectiveConcurrency(config.GlobalConfig.SpeedConcurrent, config.GlobalConfig.Concurrent, len(filteredResults))
-		slog.Info(fmt.Sprintf("阶段3-测速: 节点数=%d, 并发数=%d", len(filteredResults), speedConcurrency))
-		resumeProgress()
-		pc.results = pc.runSpeedPhase(filteredResults, speedConcurrency)
-		pauseProgress()
-		SavePhaseResult(3, Available.Load(), ProxyCount.Load())
-		slog.Info(fmt.Sprintf("测速通过节点数量: %d", len(pc.results)))
-	} else {
-		// 无测速：过滤后直接作为最终结果
-		pc.results = filteredResults
+	// Dispatcher
+	go pipelineDispatch(ctx, proxies, aliveIn)
+
+	// Alive workers
+	aliveWg := pc.startAliveWorkers(ctx, aliveConcurrency, aliveIn, mediaIn)
+	go func() { aliveWg.Wait(); close(mediaIn) }()
+
+	// Media workers (filter runs inline on each passing item)
+	mediaWg := pc.startMediaWorkers(ctx, mediaConcurrency, mediaIn, speedIn, collectIn, hasSpeedTest, patterns)
+	go func() {
+		mediaWg.Wait()
+		close(speedIn)
+		if !hasSpeedTest {
+			close(collectIn)
+		}
+	}()
+
+	// Speed workers (optional)
+	if hasSpeedTest {
+		speedWg := pc.startSpeedWorkers(ctx, speedConcurrency, speedIn, collectIn, speedTestURL)
+		go func() { speedWg.Wait(); close(collectIn) }()
+	}
+
+	// Collector: place items in pre-allocated slots to preserve subscription order.
+	// The SuccessLimit hit notice is *not* logged here: emitting slog output
+	// mid-render interleaves with the progress writer and breaks cursor-up
+	// positioning. We remember whether we tripped the limit and log it after
+	// pauseProgress has parked the renderer.
+	out := make([]*Result, total)
+	var finalPassed int32
+	limitHit := false
+	for item := range collectIn {
+		r := item.r
+		out[item.idx] = &r
+		finalPassed++
+		if config.GlobalConfig.SuccessLimit > 0 && finalPassed >= config.GlobalConfig.SuccessLimit && !limitHit {
+			limitHit = true
+			cancel()
+		}
+	}
+
+	pauseProgress()
+
+	if limitHit {
+		slog.Warn(fmt.Sprintf("达到成功数量限制: %d，已停止流水线", config.GlobalConfig.SuccessLimit))
+	} else if ctx.Err() != nil {
+		// External cancel (RequestCancel via SIGHUP / HTTP force-close).
+		// Logged here rather than in RequestCancel because emitting it
+		// while the progress renderer is still drawing would let the
+		// next frame's cursor-up escape overwrite the warn line.
+		slog.Warn("收到取消信号，已停止流水线")
+	}
+
+	// Snapshot per-stage results. Totals cascade: alive counts against input,
+	// media counts against alive, speed counts against filter-passed.
+	aliveOk := Available.Load()
+	mediaDone := MediaDone.Load()
+	filterPassed := FilterPassed.Load()
+	SavePhaseResult(1, aliveOk, uint32(total))
+	SavePhaseResult(2, mediaDone, aliveOk)
+	if hasSpeedTest {
+		SavePhaseResult(3, SpeedOk.Load(), filterPassed)
+	}
+
+	// Flatten in subscription order, dropping empty slots.
+	pc.results = make([]Result, 0, finalPassed)
+	for _, r := range out {
+		if r != nil {
+			pc.results = append(pc.results, *r)
+		}
 	}
 
 	if config.GlobalConfig.PrintProgress {
 		done <- true
 	}
-
 	Phase.Store(0)
 
-	if config.GlobalConfig.SuccessLimit > 0 && pc.available >= config.GlobalConfig.SuccessLimit {
-		slog.Warn(fmt.Sprintf("达到节点数量限制: %d", config.GlobalConfig.SuccessLimit))
+	slog.Info(fmt.Sprintf("存活节点数量: %d", aliveOk))
+	if len(patterns) > 0 {
+		slog.Info(fmt.Sprintf("过滤前节点数量: %d, 过滤后节点数量: %d", mediaDone, filterPassed))
+	} else if hasSpeedTest {
+		slog.Info(fmt.Sprintf("流媒体阶段通过数量: %d", filterPassed))
 	}
 	slog.Info(fmt.Sprintf("可用节点数量: %d", len(pc.results)))
 	slog.Info(fmt.Sprintf("测试总消耗流量: %.3fGB", float64(TotalBytes.Load())/1024/1024/1024))
 
-	// 检查订阅成功率并发出警告
 	pc.checkSubscriptionSuccessRate(proxies)
 
 	return pc.results, nil
 }
 
-// runAlivePhase 执行测活阶段
-// applySuccessLimit: 当没有测速阶段时，SuccessLimit 在此阶段生效
-// 采用分槽法保序:worker 写入预分配的固定下标,最终按 proxies 输入顺序 flatten,
-// 保证输出与 GetProxies 的订阅顺序一致(本地订阅在前)。
-func (pc *ProxyChecker) runAlivePhase(proxies []map[string]any, concurrency int, applySuccessLimit bool) []aliveResult {
-	type aliveTask struct {
-		idx   int
-		proxy map[string]any
-	}
-	out := make([]*aliveResult, len(proxies))
-	var wg sync.WaitGroup
-	tasks := make(chan aliveTask, 1)
+// ======= Pipeline types =======
 
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for t := range tasks {
-				if r := pc.checkAlive(t.proxy); r != nil {
-					out[t.idx] = r
-					pc.incrementAvailable()
-				}
-				pc.incrementProgress()
-			}
-		}()
-	}
-
-	go func() {
-		for i, proxy := range proxies {
-			if applySuccessLimit && config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
-				slog.Warn(fmt.Sprintf("达到存活成功数量限制: %d，停止派发", config.GlobalConfig.SuccessLimit))
-				break
-			}
-			if ForceClose.Load() {
-				slog.Warn("收到强制关闭信号，停止派发任务")
-				break
-			}
-			tasks <- aliveTask{idx: i, proxy: proxy}
-		}
-		close(tasks)
-	}()
-
-	wg.Wait()
-
-	results := make([]aliveResult, 0, len(out))
-	for _, r := range out {
-		if r != nil {
-			results = append(results, *r)
-		}
-	}
-	return results
+// aliveTask is an input proxy plus its original index (for order preservation).
+type aliveTask struct {
+	idx   int
+	proxy map[string]any
 }
 
-// runSpeedPhase 执行测速阶段。
-// 入参是已经通过 filter 的 Result 集合。
-// 通过 min-speed 的节点填充 Result.Speed;未通过的节点被丢弃。
-// ForceClose 或 SuccessLimit 时未测速的节点都直接丢弃,
-// 避免和已测速节点混在一起造成"有的有速度标签有的没有"的乱象。
-// 采用分槽法保序:worker 写入预分配的固定下标,最终按 in 输入顺序 flatten。
-func (pc *ProxyChecker) runSpeedPhase(in []Result, concurrency int) []Result {
-	type speedTask struct {
-		idx int
-		r   Result
-	}
-	out := make([]*Result, len(in))
-	var wg sync.WaitGroup
-	tasks := make(chan speedTask, 1)
-
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for t := range tasks {
-				if updated := pc.checkSpeed(t.r); updated != nil {
-					out[t.idx] = updated
-					pc.incrementAvailable()
-				}
-				pc.incrementProgress()
-			}
-		}()
-	}
-
-	go func() {
-		for i, r := range in {
-			if config.GlobalConfig.SuccessLimit > 0 && atomic.LoadInt32(&pc.available) >= config.GlobalConfig.SuccessLimit {
-				slog.Warn(fmt.Sprintf("达到测速成功数量限制: %d，停止派发", config.GlobalConfig.SuccessLimit))
-				break
-			}
-			if ForceClose.Load() {
-				slog.Warn("收到强制关闭信号，停止派发测速任务，未测速节点将丢弃")
-				break
-			}
-			tasks <- speedTask{idx: i, r: r}
-		}
-		close(tasks)
-	}()
-
-	wg.Wait()
-
-	results := make([]Result, 0, len(out))
-	for _, r := range out {
-		if r != nil {
-			results = append(results, *r)
-		}
-	}
-	return results
+// mediaEntry carries an alive-pass proxy into the media stage.
+type mediaEntry struct {
+	idx int
+	a   aliveResult
 }
 
-// runMediaPhase 执行流媒体检测 + 国家查询阶段。
-// 不会修改 proxy["name"];检测结果写入 Result 的结构化字段。
-// ForceClose 时未派发的节点直接丢弃,只输出已完成检测的节点,
-// 避免和已检测节点混在一起造成"有的有标签有的没有"的乱象。
-// 采用分槽法保序:worker 写入预分配的固定下标,最终按 alive 输入顺序 flatten。
-func (pc *ProxyChecker) runMediaPhase(alive []aliveResult, concurrency int) []Result {
-	type mediaTask struct {
-		idx int
-		a   aliveResult
-	}
-	out := make([]*Result, len(alive))
-	var wg sync.WaitGroup
-	tasks := make(chan mediaTask, 1)
+// pipelineItem flows through filter, speed test, and the collector.
+type pipelineItem struct {
+	idx int
+	r   Result
+}
 
-	for i := 0; i < concurrency; i++ {
+// ======= Pipeline stages =======
+//
+// The pipeline runs alive / media+filter / speed concurrently, connected
+// by channels. An idx field rides along each item so the collector can
+// restore original subscription order before emitting the final slice.
+//
+// Cancellation: a single context.Context covers the entire pipeline.
+// SuccessLimit causes the collector to cancel it once N passes have been
+// gathered; goroutines then drain their inputs and exit.
+
+// pipelineDispatch feeds proxies into the alive stage in input order.
+// Closes out on exit and honours ctx cancellation.
+func pipelineDispatch(ctx context.Context, proxies []map[string]any, out chan<- aliveTask) {
+	defer close(out)
+	for i, proxy := range proxies {
+		select {
+		case <-ctx.Done():
+			return
+		case out <- aliveTask{idx: i, proxy: proxy}:
+		}
+	}
+}
+
+// startAliveWorkers spawns n alive-check workers.
+// Cancellation policy (middle stage): when cancel fires, workers stop
+// pulling new items from their input queue *and* allow in-flight items
+// to be dropped at the send boundary via a ctx-aware select. This
+// prevents items queued at the time of cancel from triggering wasted
+// work in the downstream media / speed stages.
+// Items already classified as "passed speed" never get dropped — see
+// startSpeedWorkers for the asymmetric policy at the last boundary.
+func (pc *ProxyChecker) startAliveWorkers(ctx context.Context, n int, in <-chan aliveTask, out chan<- mediaEntry) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for t := range tasks {
-				out[t.idx] = pc.checkMedia(t.a)
+			for t := range in {
+				if ctx.Err() != nil {
+					return
+				}
+				r := pc.checkAlive(t.proxy)
 				pc.incrementProgress()
+				if r == nil {
+					continue
+				}
+				pc.incrementAvailable()
+				select {
+				case <-ctx.Done():
+					return
+				case out <- mediaEntry{idx: t.idx, a: *r}:
+				}
 			}
 		}()
 	}
+	return &wg
+}
 
-	go func() {
-		for i, a := range alive {
-			if ForceClose.Load() {
-				slog.Warn("收到强制关闭信号，停止派发流媒体任务，未检测节点将丢弃")
-				break
+// startMediaWorkers spawns n media-check workers.
+// checkMedia always produces a Result; the worker applies the filter inline
+// and forwards passing items to speedOut (hasSpeed) or collectOut (!hasSpeed).
+// Cancellation policy:
+//   - hasSpeed: middle stage, ctx-aware select on speedOut (drops on cancel
+//     race so cancel-dropped items don't waste a ~10s speed test)
+//   - !hasSpeed: last stage, unconditional send to collectOut so items
+//     classified as passing the filter are never dropped at the final hop
+func (pc *ProxyChecker) startMediaWorkers(
+	ctx context.Context,
+	n int,
+	in <-chan mediaEntry,
+	speedOut, collectOut chan<- pipelineItem,
+	hasSpeed bool,
+	patterns []*regexp.Regexp,
+) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for entry := range in {
+				if ctx.Err() != nil {
+					return
+				}
+				res := pc.checkMedia(entry.a)
+				MediaDone.Add(1)
+				if res == nil || !MatchesFilter(*res, patterns) {
+					continue
+				}
+				FilterPassed.Add(1)
+				if hasSpeed {
+					select {
+					case <-ctx.Done():
+						return
+					case speedOut <- pipelineItem{idx: entry.idx, r: *res}:
+					}
+				} else {
+					// last stage — collector always reads collectIn, so the
+					// unconditional send never blocks; guarantees every
+					// filter-passed item ends up in the output.
+					collectOut <- pipelineItem{idx: entry.idx, r: *res}
+				}
 			}
-			tasks <- mediaTask{idx: i, a: a}
-		}
-		close(tasks)
-	}()
-
-	wg.Wait()
-
-	results := make([]Result, 0, len(out))
-	for _, r := range out {
-		if r != nil {
-			results = append(results, *r)
-		}
+		}()
 	}
-	return results
+	return &wg
+}
+
+// startSpeedWorkers spawns n speed-test workers.
+// Last stage before the collector: items that pass min-speed are sent
+// unconditionally so an item classified as "good" is never dropped at
+// the final hop, even if cancel fires between SpeedOk.Add and the send.
+// ctx.Err is only checked at the top of the loop to avoid starting a
+// fresh ~10s speed test once we've already tripped SuccessLimit.
+//
+// speedTestURL is passed through (captured at pipeline start) so the
+// run stays self-consistent even if the user edits SpeedTestUrl in
+// the config file mid-check.
+func (pc *ProxyChecker) startSpeedWorkers(ctx context.Context, n int, in <-chan pipelineItem, out chan<- pipelineItem, speedTestURL string) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range in {
+				if ctx.Err() != nil {
+					return
+				}
+				updated := pc.checkSpeed(item.r, speedTestURL)
+				SpeedDone.Add(1)
+				if updated == nil {
+					continue
+				}
+				SpeedOk.Add(1)
+				out <- pipelineItem{idx: item.idx, r: *updated}
+			}
+		}()
+	}
+	return &wg
 }
 
 // checkAlive 检测单个代理是否存活
@@ -409,7 +528,9 @@ func (pc *ProxyChecker) checkAlive(proxy map[string]any) *aliveResult {
 // checkSpeed 对已有的 Result 执行测速。
 // 通过 min-speed 的节点填充 r.Speed 并返回;未通过的返回 nil。
 // 不修改 proxy["name"]。
-func (pc *ProxyChecker) checkSpeed(r Result) *Result {
+// speedTestURL 由调用方在流水线启动时冻结的快照,避免 config 热重载
+// 把 URL 置空后把当前这一轮的所有测速请求打穿(no host error)。
+func (pc *ProxyChecker) checkSpeed(r Result, speedTestURL string) *Result {
 	if os.Getenv("SUB_CHECK_SKIP") != "" {
 		r.Speed = 0
 		return &r
@@ -421,7 +542,7 @@ func (pc *ProxyChecker) checkSpeed(r Result) *Result {
 	}
 	defer httpClient.Close()
 
-	speed, _, err := platform.CheckSpeed(httpClient.Client, Bucket, httpClient.BytesRead)
+	speed, _, err := platform.CheckSpeed(httpClient.Client, Bucket, httpClient.BytesRead, speedTestURL)
 	if err != nil || speed < config.GlobalConfig.MinSpeed {
 		return nil
 	}
@@ -432,17 +553,16 @@ func (pc *ProxyChecker) checkSpeed(r Result) *Result {
 
 // checkMedia 执行流媒体检测和必要的国家查询。
 // 不会丢弃节点,不会修改 proxy["name"];检测结果写入 Result 的结构化字段。
+// Counter updates are owned by the caller (media pipeline worker).
 func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
 	res := &Result{Proxy: a.Proxy}
 
 	if os.Getenv("SUB_CHECK_SKIP") != "" {
-		pc.incrementAvailable()
 		return res
 	}
 
 	httpClient := CreateClient(a.Proxy)
 	if httpClient == nil {
-		pc.incrementAvailable()
 		return res
 	}
 	defer httpClient.Close()
@@ -550,63 +670,7 @@ func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
 		res.Country = country
 	}
 
-	pc.incrementAvailable()
 	return res
-}
-
-// showProgress 显示进度条
-func (pc *ProxyChecker) showProgress(done chan bool) {
-	type phaseInfo struct {
-		name       string
-		countLabel string
-	}
-	phases := map[uint32]phaseInfo{
-		1: {"测活", "存活"},
-		2: {"流媒体+重命名", "完成"},
-		3: {"测速", "通过"},
-	}
-	for {
-		select {
-		case <-done:
-			// pauseProgress 已经在阶段结束时把 \r 行收尾换行了,
-			// 这里只在还有未收尾的进度行时才补换行,避免在已经干净的输出后多插一个空行
-			if progressRendered.Load() {
-				fmt.Println()
-			}
-			return
-		default:
-			if progressPaused.Load() {
-				time.Sleep(100 * time.Millisecond)
-				break
-			}
-
-			current := atomic.LoadInt32(&pc.progress)
-			available := atomic.LoadInt32(&pc.available)
-
-			if pc.proxyCount == 0 {
-				time.Sleep(100 * time.Millisecond)
-				break
-			}
-
-			info, ok := phases[Phase.Load()]
-			if !ok {
-				info = phaseInfo{"检测", "可用"}
-			}
-
-			// if 0/0 = NaN ,shoule panic
-			percent := float64(current) / float64(pc.proxyCount) * 100
-			progressRendered.Store(true)
-			fmt.Printf("\r[%s] 进度: [%-45s] %.1f%% (%d/%d) %s: %d",
-				info.name,
-				strings.Repeat("=", int(percent/2))+">",
-				percent,
-				current,
-				pc.proxyCount,
-				info.countLabel,
-				available)
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
 }
 
 // pauseProgress 暂停进度条并换行，确保后续日志不会与进度条混在一行
@@ -637,13 +701,21 @@ func (pc *ProxyChecker) incrementAvailable() {
 }
 
 func (pc *ProxyChecker) resetPhaseCounters(count int) {
-	ForceClose.Store(false)
+	// Cancellation is scoped per-phase via installPhaseCancel, no reset needed here.
 	pc.proxyCount = count
 	atomic.StoreInt32(&pc.progress, 0)
 	atomic.StoreInt32(&pc.available, 0)
 	Progress.Store(0)
 	Available.Store(0)
 	ProxyCount.Store(uint32(count))
+
+	// Reset downstream pipeline counters as well so a fresh run doesn't
+	// inherit totals from a previous one (affects both the web admin UI
+	// and the three-line CLI progress renderer).
+	MediaDone.Store(0)
+	FilterPassed.Store(0)
+	SpeedDone.Store(0)
+	SpeedOk.Store(0)
 }
 
 // checkSubscriptionSuccessRate 检查订阅成功率并发出警告
