@@ -90,10 +90,14 @@ func (app *App) Initialize() error {
 	if config.GlobalConfig.SubStorePort != "" {
 		if runtime.GOOS == "linux" && runtime.GOARCH == "386" {
 			slog.Warn("node不支持Linux 32位系统，不启动sub-store服务")
+		} else if nodePath, err := assets.ResolveNodePath(); err != nil {
+			slog.Warn("sub-store未启动，请安装Node.js或设置NODEBIN_PATH", "error", err)
+		} else {
+			slog.Info("sub-store将使用系统Node.js", "node", nodePath)
+			go assets.RunSubStoreService(nodePath)
+			// 求等吗得，日志会按预期顺序输出
+			time.Sleep(500 * time.Millisecond)
 		}
-		go assets.RunSubStoreService()
-		// 求等吗得，日志会按预期顺序输出
-		time.Sleep(500 * time.Millisecond)
 	}
 
 	// 启动内存监控

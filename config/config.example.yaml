@@ -139,6 +139,7 @@ recipient-url:
 notify-title: "🔔 节点状态更新"
 
 # sub-store的启动端口，为空则不启动sub-store
+# Docker 镜像内已内置 Node.js；源码运行或二进制运行时，如需启用 sub-store，请先安装 Node.js 或设置 NODEBIN_PATH
 # 更新需重启程序，不可监听局域网IP，只有三种写法 :8299, 127.0.0.1:8299, 0.0.0.0:8299
 # sub-store-port: ":8299"
 sub-store-port: ":8299"
@@ -206,7 +207,7 @@ sub-urls-retry: 3
 sub-urls-concurrent: 20
 # 获取订阅时使用的UA；如果设置random将会使用随机UA获取订阅
 # sub-urls-get-ua: "random"
-sub-urls-get-ua: "clash.meta (https://github.com/beck-8/subs-check)"
+sub-urls-get-ua: "clash.meta (https://github.com/RockerHX/subs-check)"
 # Github Proxy，获取订阅使用，结尾要带的 /
 # github-proxy: "https://ghfast.top/"
 github-proxy: ""

@@ -1,20 +1,19 @@
 <h1 align="center">🚀 订阅检测转换工具</h1>
 
 <p align="center">
-	<a href="https://github.com/beck-8/subs-check/releases"><img src="https://img.shields.io/github/v/release/beck-8/subs-check?style=flat-square&include_prereleases&label=version" /></a>
-	<a href="https://github.com/beck-8/subs-check/releases"><img src="https://img.shields.io/github/downloads/beck-8/subs-check/total.svg?style=flat-square" /></a>
-  <a href="https://hub.docker.com/r/beck8/subs-check/tags"><img src="https://img.shields.io/docker/pulls/beck8/subs-check" /></a>
-	<a href="https://github.com/beck-8/subs-check/issues"><img src="https://img.shields.io/github/issues-raw/beck-8/subs-check.svg?style=flat-square&label=issues" /></a>
-	<a href="https://github.com/beck-8/subs-check/graphs/contributors"><img src="https://img.shields.io/github/contributors/beck-8/subs-check?style=flat-square" /></a>
-	<a href="https://github.com/beck-8/subs-check/blob/master/LICENSE"><img src="https://img.shields.io/github/license/beck-8/subs-check?style=flat-square" /></a>
+	<a href="https://github.com/RockerHX/subs-check/releases"><img src="https://img.shields.io/github/v/release/RockerHX/subs-check?style=flat-square&include_prereleases&label=version" /></a>
+	<a href="https://github.com/RockerHX/subs-check/releases"><img src="https://img.shields.io/github/downloads/RockerHX/subs-check/total.svg?style=flat-square" /></a>
+	<a href="https://github.com/RockerHX/subs-check/issues"><img src="https://img.shields.io/github/issues-raw/RockerHX/subs-check.svg?style=flat-square&label=issues" /></a>
+	<a href="https://github.com/RockerHX/subs-check/graphs/contributors"><img src="https://img.shields.io/github/contributors/RockerHX/subs-check?style=flat-square" /></a>
+	<a href="https://github.com/RockerHX/subs-check/blob/master/LICENSE"><img src="https://img.shields.io/github/license/RockerHX/subs-check?style=flat-square" /></a>
 </p>
 
 ---
 
 > **✨ 修复逻辑、简化操作、增加功能、节省内存、一键启动无需配置**
 
-> **⚠️ 注意：** 功能更新频繁，请查看最新的[配置文件](https://github.com/beck-8/subs-check/blob/master/config/config.example.yaml)以获取最新功能。  
-> **⚠️ 注意：** 如果想要查看功能更新，可以参照 [示例配置提交历史](https://github.com/beck-8/subs-check/commits/master/config/config.example.yaml),这里有变动说明有更功能/逻辑更新
+> **⚠️ 注意：** 功能更新频繁，请查看最新的[配置文件](https://github.com/RockerHX/subs-check/blob/master/config/config.example.yaml)以获取最新功能。  
+> **⚠️ 注意：** 如果想要查看功能更新，可以参照 [示例配置提交历史](https://github.com/RockerHX/subs-check/commits/master/config/config.example.yaml),这里有变动说明有更功能/逻辑更新
 
 ## 📸 预览
 
@@ -48,16 +47,16 @@
 
 ```bash
 # 默认安装
-bash <(curl -fsSL https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh)
 
 # 使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh)
 
 # 如果无法访问 GitHub，可使用代理
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh) https://ghfast.top/
+bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh) https://ghfast.top/
 
 # Alpine 等无 bash 环境
-wget -qO /tmp/install.sh https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
+wget -qO /tmp/install.sh https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
 ```
 
 <details>
@@ -89,6 +88,13 @@ systemctl daemon-reload
 ```
 
 </details>
+
+### 🔄 Fork 发布流
+
+1. 使用 `Sync from Upstream` workflow 将上游最新代码同步到 `dev`
+2. `dev` 分支 push 后会自动执行测试、二进制构建、snapshot release 构建和 Docker build 验证
+3. 你确认 `dev` 通过后，再手动合并到 `master`
+4. 仅在 `master` 上创建并推送 `v*.*.*` tag 时，才会正式发布 GitHub Release 和 Docker Hub 镜像
 
 ### 🪜 代理设置（可选）
 <details>
@@ -141,6 +147,7 @@ speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 > **⚠️ 注意：**  
 > - 限制内存请使用 `--memory="500m"`。  
 > - 可通过环境变量 `API_KEY` 设置 Web 控制面板的 API Key。
+> - Docker 镜像内已安装 Node.js，sub-store 可直接使用。
 
 ```bash
 # 基础运行
@@ -151,7 +158,7 @@ docker run -d \
   -v ./config:/app/config \
   -v ./output:/app/output \
   --restart always \
-  ghcr.io/beck-8/subs-check:latest
+  your-dockerhub-username/subs-check:latest
 
 # 使用代理运行
 docker run -d \
@@ -163,7 +170,7 @@ docker run -d \
   -v ./config:/app/config \
   -v ./output:/app/output \
   --restart always \
-  ghcr.io/beck-8/subs-check:latest
+  your-dockerhub-username/subs-check:latest
 ```
 
 ### 📜 Docker-Compose
@@ -172,7 +179,7 @@ docker run -d \
 version: "3"
 services:
   subs-check:
-    image: ghcr.io/beck-8/subs-check:latest
+    image: your-dockerhub-username/subs-check:latest
     container_name: subs-check
     volumes:
       - ./config:/app/config
@@ -190,13 +197,17 @@ services:
 ```
 ### 📦 二进制文件运行
 
-下载 [Releases](https://github.com/beck-8/subs-check/releases) 中适合的版本，解压后直接运行即可。
+下载 [Releases](https://github.com/RockerHX/subs-check/releases) 中适合的版本，解压后直接运行即可。
+
+如果需要启用 sub-store，请确保系统已安装 Node.js，或提前设置 `NODEBIN_PATH` 指向可用的 node 可执行文件。
 
 ### 🖥️ 源码运行
 
 ```bash
 go run . -f ./config/config.yaml
 ```
+
+如果需要启用 sub-store，请确保系统已安装 Node.js，或提前设置 `NODEBIN_PATH`。
 
 ## 🔔 通知渠道配置（可选）
 <details>
@@ -347,7 +358,7 @@ graph TD
 
 ## ⭐ Star History
 
-[![Stargazers over time](https://starchart.cc/beck-8/subs-check.svg?variant=adaptive)](https://starchart.cc/beck-8/subs-check)
+[![Stargazers over time](https://starchart.cc/RockerHX/subs-check.svg?variant=adaptive)](https://starchart.cc/RockerHX/subs-check)
 
 ## ⚖️ 免责声明
 

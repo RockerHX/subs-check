@@ -10,27 +10,40 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/beck-8/subs-check/config"
 	"github.com/beck-8/subs-check/save/method"
 	"github.com/klauspost/compress/zstd"
-	"github.com/shirou/gopsutil/v4/process"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func RunSubStoreService() {
+func ResolveNodePath() (string, error) {
+	if nodeBinPath := strings.TrimSpace(os.Getenv("NODEBIN_PATH")); nodeBinPath != "" {
+		if _, err := os.Stat(nodeBinPath); err != nil {
+			return "", fmt.Errorf("NODEBIN_PATH=%q 不可用: %w", nodeBinPath, err)
+		}
+		return nodeBinPath, nil
+	}
+
+	nodePath, err := exec.LookPath("node")
+	if err != nil {
+		return "", fmt.Errorf("未找到 node，可安装 Node.js 或设置 NODEBIN_PATH")
+	}
+	return nodePath, nil
+}
+
+func RunSubStoreService(nodePath string) {
 	for {
-		if err := startSubStore(); err != nil {
+		if err := startSubStore(nodePath); err != nil {
 			slog.Error("Sub-store service crashed, restarting...", "error", err)
 		}
 		time.Sleep(time.Second * 30)
 	}
 }
 
-func startSubStore() error {
+func startSubStore(nodePath string) error {
 	saver, err := method.NewLocalSaver()
 	if err != nil {
 		return err
@@ -39,34 +52,15 @@ func startSubStore() error {
 		// 处理用户写相对路径的问题
 		saver.OutputPath = filepath.Join(saver.BasePath, saver.OutputPath)
 	}
-	nodeName := "node"
-	if runtime.GOOS == "windows" {
-		nodeName += ".exe"
-	}
 
 	os.MkdirAll(saver.OutputPath, 0755)
-	nodePath := filepath.Join(saver.OutputPath, nodeName)
 	jsPath := filepath.Join(saver.OutputPath, "sub-store.bundle.js")
 	overYamlPath := filepath.Join(saver.OutputPath, "ACL4SSR_Online_Full.yaml")
 	logPath := filepath.Join(saver.OutputPath, "sub-store.log")
 
-	killNode := func() {
-		pid, err := findProcesses(nodePath)
-		if err == nil {
-			err := killProcess(pid)
-			if err != nil {
-				slog.Debug("Sub-store service kill failed", "error", err)
-			}
-			slog.Debug("Sub-store service already killed", "pid", pid)
-		}
-	}
-	defer killNode()
-
-	// 如果subs-check内存问题退出，会导致node二进制损坏，启动的node变成僵尸，所以删一遍
-	os.Remove(nodePath)
 	os.Remove(jsPath)
 	os.Remove(overYamlPath)
-	if err := decodeZstd(nodePath, jsPath, overYamlPath); err != nil {
+	if err := decodeZstd(jsPath, overYamlPath); err != nil {
 		return err
 	}
 
@@ -79,10 +73,6 @@ func startSubStore() error {
 	}
 	defer logWriter.Close()
 
-	// 支持自定义node二进制文件路径，可兼容更多的设备
-	if nodeBinPath := os.Getenv("NODEBIN_PATH"); nodeBinPath != "" {
-		nodePath = nodeBinPath
-	}
 	// 支持自定义sub-store脚本路径
 	if subStoreBinPath := os.Getenv("SUB_STORE_PATH"); subStoreBinPath != "" {
 		jsPath = subStoreBinPath
@@ -214,25 +204,13 @@ func isLocalIP(host string) bool {
 	return false
 }
 
-func decodeZstd(nodePath, jsPath, overYamlPath string) error {
+func decodeZstd(jsPath, overYamlPath string) error {
 	// 创建 zstd 解码器
 	zstdDecoder, err := zstd.NewReader(nil)
 	if err != nil {
 		return fmt.Errorf("创建zstd解码器失败: %w", err)
 	}
 	defer zstdDecoder.Close()
-
-	// 解压 node 二进制文件
-	nodeFile, err := os.OpenFile(nodePath, os.O_CREATE|os.O_WRONLY, 0755)
-	if err != nil {
-		return fmt.Errorf("创建 node 文件失败: %w", err)
-	}
-	defer nodeFile.Close()
-
-	zstdDecoder.Reset(bytes.NewReader(EmbeddedNode))
-	if _, err := io.Copy(nodeFile, zstdDecoder); err != nil {
-		return fmt.Errorf("解压 node 二进制文件失败: %w", err)
-	}
 
 	// 解压 sub-store 脚本
 	jsFile, err := os.OpenFile(jsPath, os.O_CREATE|os.O_WRONLY, 0644)
@@ -256,36 +234,6 @@ func decodeZstd(nodePath, jsPath, overYamlPath string) error {
 	zstdDecoder.Reset(bytes.NewReader(EmbeddedOverrideYaml))
 	if _, err := io.Copy(overYamlFile, zstdDecoder); err != nil {
 		return fmt.Errorf("解压 ACL4SSR_Online_Full.yaml 失败: %w", err)
-	}
-	return nil
-}
-
-func findProcesses(targetName string) (int32, error) {
-	processes, err := process.Processes()
-	if err != nil {
-		return 0, fmt.Errorf("获取进程列表失败: %v", err)
-	}
-
-	for _, p := range processes {
-		name, err := p.Exe()
-		// if err != nil {
-		// 	// slog.Debug("获取进程名称失败", "error", err)
-		// }
-		if err == nil && name == targetName {
-			return p.Pid, nil
-		}
-	}
-	return 0, fmt.Errorf("未找到进程")
-}
-
-func killProcess(pid int32) error {
-	p, err := process.NewProcess(pid)
-	if err != nil {
-		return fmt.Errorf("无法找到进程 %d: %v", pid, err)
-	}
-
-	if err := p.Kill(); err != nil {
-		return fmt.Errorf("杀死进程 %d 失败: %v", pid, err)
 	}
 	return nil
 }

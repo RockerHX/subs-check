@@ -5,7 +5,7 @@ SHELL=/usr/bin/env bash
 BINARY := subs-check
 COMMIT := $(shell git rev-parse --short HEAD)
 COMMIT_TIMESTAMP := $(shell git log -1 --format=%ct)
-VERSION := $(shell git describe --tags --abbrev=0)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GO_BIN := go
 
 # 构建标志

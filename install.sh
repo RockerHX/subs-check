@@ -1,14 +1,14 @@
 #!/bin/sh
 # subs-check 一键安装脚本
 # 兼容 bash / sh / dash
-# 用法: curl -fsSL https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh | bash
-#   或: wget -qO- https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh | bash
-# 加速: bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh) https://ghfast.top/
+# 用法: curl -fsSL https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh | bash
+#   或: wget -qO- https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh | bash
+# 加速: bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/RockerHX/subs-check/master/install.sh) https://ghfast.top/
 
 set -e
 
 # ============ 配置 ============
-REPO="beck-8/subs-check"
+REPO="RockerHX/subs-check"
 INSTALL_DIR="/opt/subs-check"
 BINARY_NAME="subs-check"
 SERVICE_NAME="subs-check"
@@ -234,6 +234,7 @@ print_info() {
     printf "  版本:       %s\n" "$LATEST_VERSION"
     printf "  安装目录:   %s\n" "$INSTALL_DIR"
     printf "  配置文件:   %s/config/config.yaml\n" "$INSTALL_DIR"
+    printf "  提示:       如需启用 sub-store，请确保系统已安装 Node.js 或设置 NODEBIN_PATH\n"
 
     if [ "$HAS_SYSTEMD" -eq 1 ]; then
         printf "  服务管理:\n"
