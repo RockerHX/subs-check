@@ -1,12 +1,17 @@
 package method
 
 import (
+	"os"
 	"testing"
 
 	"github.com/beck-8/subs-check/config"
 )
 
 func TestUploadToS3(t *testing.T) {
+	if os.Getenv("TEST_MINIO") != "1" {
+		t.Skip("integration test; set TEST_MINIO=1 to run against a local MinIO instance")
+	}
+
 	config.GlobalConfig.S3Endpoint = "127.0.0.1:9000"
 	config.GlobalConfig.S3AccessID = "123"
 	config.GlobalConfig.S3SecretKey = "123"
