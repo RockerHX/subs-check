@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-# bump_version.ps1 - 交互式记录版本、提交并创建发布 tag（不 push）
+# bump_version.ps1 - 交互式记录版本、提交、创建并推送发布 tag
 #
 # 用法（在仓库根目录 PowerShell 中运行）：
 #   .\scripts\bump_version.ps1
@@ -17,6 +17,12 @@ if ($LASTEXITCODE -ne 0) {
 & git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: 暂存区有未提交改动，请先处理干净再运行。" -ForegroundColor Red
+    exit 1
+}
+
+$currentBranch = (& git branch --show-current).Trim()
+if ($currentBranch -ne "master") {
+    Write-Host "Error: 当前分支是 '$currentBranch'，请切换到 master 后再运行。" -ForegroundColor Red
     exit 1
 }
 
@@ -55,9 +61,10 @@ Add-Content -Path "release.log" -Value "$timestamp $tagName"
 & git add release.log
 & git commit -m "release: $tagName"
 & git tag $tagName
+& git push origin $currentBranch
+& git push origin $tagName
 
 Write-Host "已记录 release.log 并提交: release: $tagName" -ForegroundColor Green
 Write-Host "已创建 tag: $tagName" -ForegroundColor Green
-Write-Host "请手动执行 push，例如：" -ForegroundColor Yellow
-Write-Host "  git push origin master" -ForegroundColor Yellow
-Write-Host "  git push origin $tagName" -ForegroundColor Yellow
+Write-Host "已推送分支: $currentBranch" -ForegroundColor Green
+Write-Host "已推送 tag: $tagName" -ForegroundColor Green

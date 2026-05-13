@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bump_version.sh - 交互式记录版本、提交并创建发布 tag（不 push）
+# bump_version.sh - 交互式记录版本、提交、创建并推送发布 tag
 
 set -euo pipefail
 
@@ -8,6 +8,12 @@ cd "$ROOT_DIR"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Error: 工作区或暂存区有未提交改动，请先处理干净再运行。" >&2
+  exit 1
+fi
+
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "$CURRENT_BRANCH" != "master" ]]; then
+  echo "Error: 当前分支是 '$CURRENT_BRANCH'，请切换到 master 后再运行。" >&2
   exit 1
 fi
 
@@ -48,6 +54,8 @@ git tag "$TAG_NAME"
 
 echo "已记录 release.log 并提交: release: $TAG_NAME"
 echo "已创建 tag: $TAG_NAME"
-echo "请手动执行 push，例如："
-echo "  git push origin master"
-echo "  git push origin $TAG_NAME"
+git push origin "$CURRENT_BRANCH"
+git push origin "$TAG_NAME"
+
+echo "已推送分支: $CURRENT_BRANCH"
+echo "已推送 tag: $TAG_NAME"
