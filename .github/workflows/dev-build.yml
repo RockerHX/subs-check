@@ -28,11 +28,12 @@ jobs:
       - name: Run tests
         run: go test ./...
 
-      - name: Build binary
+      - name: Build binaries
         run: |
           VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
           COMMIT="$(git rev-parse --short HEAD)"
           go build -trimpath -ldflags "-s -w -X main.Version=${VERSION} -X main.CurrentCommit=${COMMIT}" -o subs-check .
+          go build -trimpath -ldflags "-s -w" -o home-filter ./cmd/home-filter
 
       - name: Snapshot release build
         uses: goreleaser/goreleaser-action@v7
@@ -54,7 +55,38 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: local/subs-check:test
           platforms: linux/amd64
           build-args: |
             GITHUB_SHA=${{ github.sha }}
             VERSION=dev-${{ github.sha }}
+
+      - name: Smoke test container home-filter service
+        run: |
+          mkdir -p .tmp-ci-config
+          cat > .tmp-ci-config/config.yaml <<'EOF'
+          print-progress: false
+          check-interval: 1440
+          listen-port: ":8199"
+          rename-node: true
+          media-check: false
+          enable-web-ui: false
+          callback-script: ""
+          external-filter-url: "http://127.0.0.1:8399/filter"
+          external-filter-timeout: 10
+          sub-store-port: ""
+          output-dir: "/app/output"
+          sub-urls-remote: []
+          sub-urls: []
+          EOF
+          docker run -d --name subs-check-smoke -p 8399:8399 -v "$PWD/.tmp-ci-config:/app/config" local/subs-check:test
+          trap 'docker logs subs-check-smoke || true; docker rm -f subs-check-smoke || true; rm -rf .tmp-ci-config' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8399/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "home-filter health check failed"
+          exit 1
