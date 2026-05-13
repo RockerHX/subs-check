@@ -38,7 +38,8 @@ type Result struct {
 	IP         string
 	IPRisk     string
 	Country    string
-	Speed      int // KB/s, 0 表示未测速或测速未通过
+	Speed      int      // KB/s, 0 表示未测速或测速未通过
+	ExtraTags  []string // 外部过滤器追加的展示标签
 }
 
 // aliveResult 存活检测通过的中间结果
@@ -239,6 +240,10 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 
 	// Compile filter patterns once; media workers re-use the slice.
 	patterns := CompileFilterPatterns()
+	externalFilter := NewExternalFilterClient()
+	if externalFilter != nil {
+		slog.Info("启用外部节点过滤器", "url", config.GlobalConfig.ExternalFilterURL)
+	}
 	if len(patterns) > 0 {
 		slog.Info(fmt.Sprintf("应用节点过滤规则，共 %d 个正则表达式", len(patterns)))
 	}
@@ -262,7 +267,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	go func() { aliveWg.Wait(); close(mediaIn) }()
 
 	// Media workers (filter runs inline on each passing item)
-	mediaWg := pc.startMediaWorkers(ctx, mediaConcurrency, mediaIn, speedIn, collectIn, hasSpeedTest, patterns)
+	mediaWg := pc.startMediaWorkers(ctx, mediaConcurrency, mediaIn, speedIn, collectIn, hasSpeedTest, patterns, externalFilter)
 	go func() {
 		mediaWg.Wait()
 		close(speedIn)
@@ -438,6 +443,7 @@ func (pc *ProxyChecker) startMediaWorkers(
 	speedOut, collectOut chan<- pipelineItem,
 	hasSpeed bool,
 	patterns []*regexp.Regexp,
+	externalFilter *ExternalFilterClient,
 ) *sync.WaitGroup {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -450,9 +456,14 @@ func (pc *ProxyChecker) startMediaWorkers(
 				}
 				res := pc.checkMedia(entry.a)
 				MediaDone.Add(1)
-				if res == nil || !MatchesFilter(*res, patterns) {
+				if res == nil {
 					continue
 				}
+				filtered, ok := externalFilter.Apply(ctx, *res)
+				if !ok || !MatchesFilter(filtered, patterns) {
+					continue
+				}
+				res = &filtered
 				FilterPassed.Add(1)
 				if hasSpeed {
 					select {

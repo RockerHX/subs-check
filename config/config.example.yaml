@@ -65,6 +65,15 @@ node-type:
 # 注意：过滤在流媒体检测+重命名之后、测速之前进行。此时节点名称已包含
 #       国家和媒体标签（如 NF-US、GPT⁺、IP 风险百分比），但**不包含速度标签**。
 #       速度标签在测速通过后追加，不参与过滤。
+# 外部节点过滤服务；为空则关闭。
+# 调用时机：流媒体检测+重命名之后、内置 filter 正则之前、测速之前。
+# 请求：POST JSON 到 external-filter-url，返回 {"keep": true/false, "tags": ["HOME"]}
+# 示例：先运行 scripts/home-filter-service.sh，再设置：
+# external-filter-url: "http://127.0.0.1:8399/filter"
+external-filter-url: ""
+# 外部过滤服务单节点请求超时(秒)，<=0 时默认 10 秒
+external-filter-timeout: 10
+
 filter:
   # === 按地区过滤 ===
   # - "香港|HK|Hong Kong"        # 保留香港节点

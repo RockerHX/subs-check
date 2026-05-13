@@ -45,7 +45,10 @@ func RenderName(r Result, includeSpeed bool) string {
 		}
 	}
 
-	// 4. sub_tag 追加到最后
+	// 4. 外部过滤器标签追加在媒体标签后、订阅来源标签前
+	tags = append(tags, r.ExtraTags...)
+
+	// 5. sub_tag 追加到最后
 	if r.Proxy != nil {
 		if t, ok := r.Proxy["sub_tag"].(string); ok && t != "" {
 			tags = append(tags, t)

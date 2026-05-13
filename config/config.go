@@ -68,6 +68,9 @@ type Config struct {
 	Filter               []string `yaml:"filter"`
 	KeepDays             int      `yaml:"keep-days"`
 	DNS                  DNSConfig `yaml:"dns"`
+
+	ExternalFilterURL     string `yaml:"external-filter-url"`
+	ExternalFilterTimeout int    `yaml:"external-filter-timeout"`
 }
 
 // DNSConfig controls mihomo's global resolver used by every proxy probe.

@@ -209,6 +209,49 @@ go run . -f ./config/config.yaml
 
 如果需要启用 sub-store，请确保系统已安装 Node.js，或提前设置 `NODEBIN_PATH`。
 
+### 🏠 家宽筛选（外部过滤服务）
+
+如果你想做“家宽/机房”筛选，推荐使用仓库内置的**外部过滤服务扩展点**，不要再走 callback 后处理。
+
+1. 启动过滤服务：
+
+```bash
+./scripts/home-filter-service.sh
+```
+
+默认监听 `127.0.0.1:8399`，提供：
+
+- `GET /health`
+- `POST /filter`
+
+2. 在 `config/config.yaml` 中启用：
+
+```yaml
+external-filter-url: "http://127.0.0.1:8399/filter"
+external-filter-timeout: 10
+callback-script: ""
+```
+
+3. 正常运行 `subs-check`。处理顺序会变成：
+
+```text
+测活 -> 流媒体/重命名 -> 外部过滤服务 -> 内置 filter 正则 -> 测速 -> 保存
+```
+
+默认内置的 `tools/home-filter` 会通过节点自身出口访问 `https://api.ipapi.is/`，只保留：
+
+- `company.type == "isp"`
+- 且不是 `datacenter / proxy / vpn / tor / mobile`
+
+保留下来的节点会追加 `|HOME` 标签。
+
+如果运行环境没有 `go`，可以先自行编译：
+
+```bash
+go build -o tools/home-filter/home-filter ./tools/home-filter
+SUBS_CHECK_HOME_FILTER_BIN="$PWD/tools/home-filter/home-filter" ./scripts/home-filter-service.sh
+```
+
 ## 🔔 通知渠道配置（可选）
 <details>
   <summary>展开查看</summary>
