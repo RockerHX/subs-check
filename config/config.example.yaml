@@ -68,7 +68,9 @@ node-type:
 # 外部节点过滤服务；为空则关闭。
 # 调用时机：流媒体检测+重命名之后、内置 filter 正则之前、测速之前。
 # 请求：POST JSON 到 external-filter-url，返回 {"keep": true/false, "tags": ["HOME"]}
-# 示例：先运行 scripts/home-filter-service.sh，再设置：
+# 示例：
+# - 本地源码运行：先运行 scripts/home-filter-service.sh，再设置下方 URL
+# - Docker 运行：镜像会自动启动 home-filter，可直接设置下方 URL
 # external-filter-url: "http://127.0.0.1:8399/filter"
 external-filter-url: ""
 # 外部过滤服务单节点请求超时(秒)，<=0 时默认 10 秒

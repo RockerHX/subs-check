@@ -13,3 +13,5 @@ mihomo-check*
 .qoder/
 
 .DS_Store
+
+build/

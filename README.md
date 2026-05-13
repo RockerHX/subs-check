@@ -144,6 +144,8 @@ speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 
 ### 🐳 Docker 运行
 
+> 如果启用了 `external-filter-url: "http://127.0.0.1:8399/filter"`，Docker 镜像会自动在容器内启动 `home-filter` 服务。
+
 > **⚠️ 注意：**  
 > - 限制内存请使用 `--memory="500m"`。  
 > - 可通过环境变量 `API_KEY` 设置 Web 控制面板的 API Key。
@@ -219,7 +221,7 @@ go run . -f ./config/config.yaml
 ./scripts/home-filter-service.sh
 ```
 
-默认监听 `127.0.0.1:8399`，提供：
+本地调试时默认监听 `127.0.0.1:8399`，提供：
 
 - `GET /health`
 - `POST /filter`
@@ -238,7 +240,7 @@ callback-script: ""
 测活 -> 流媒体/重命名 -> 外部过滤服务 -> 内置 filter 正则 -> 测速 -> 保存
 ```
 
-默认内置的 `tools/home-filter` 会通过节点自身出口访问 `https://api.ipapi.is/`，只保留：
+默认内置的 `cmd/home-filter` / `internal/homefilter` 服务会通过节点自身出口访问 `https://api.ipapi.is/`，只保留：
 
 - `company.type == "isp"`
 - 且不是 `datacenter / proxy / vpn / tor / mobile`
@@ -248,9 +250,11 @@ callback-script: ""
 如果运行环境没有 `go`，可以先自行编译：
 
 ```bash
-go build -o tools/home-filter/home-filter ./tools/home-filter
-SUBS_CHECK_HOME_FILTER_BIN="$PWD/tools/home-filter/home-filter" ./scripts/home-filter-service.sh
+go build -o build/home-filter ./cmd/home-filter
+SUBS_CHECK_HOME_FILTER_BIN="$PWD/build/home-filter" ./scripts/home-filter-service.sh
 ```
+
+Docker 镜像会自动包含并启动 `home-filter`（配置文件存在时），不需要在容器里额外执行 `scripts/home-filter-service.sh`。
 
 ## 🔔 通知渠道配置（可选）
 <details>
