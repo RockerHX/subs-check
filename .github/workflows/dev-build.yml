@@ -80,10 +80,10 @@ jobs:
           sub-urls-remote: []
           sub-urls: []
           EOF
-          docker run -d --name subs-check-smoke -p 8399:8399 -v "$PWD/.tmp-ci-config:/app/config" local/subs-check:test
+          docker run -d --name subs-check-smoke -v "$PWD/.tmp-ci-config:/app/config" local/subs-check:test
           trap 'docker logs subs-check-smoke || true; docker rm -f subs-check-smoke || true; rm -rf .tmp-ci-config' EXIT
           for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8399/health >/dev/null; then
+            if docker exec subs-check-smoke sh -c 'wget -qO- http://127.0.0.1:8399/health >/dev/null'; then
               exit 0
             fi
             sleep 2
